@@ -2,8 +2,8 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h> 
 
-// Nhúng 2 file cấu hình vào
 #include "Certificates.h"
 #include "Config.h"
 
@@ -13,154 +13,154 @@ PubSubClient client(net);
 HardwareSerial SerialGM65(2);
 long lastReconnectAttempt = 0;
 
-// ==========================================================
-// HÀM: CALLBACK (XỬ LÝ KHI CÓ DATA TỪ AWS GỬI VỀ)
-// ==========================================================
-// Hàm này sẽ chạy khi ESP32 nhận được tin nhắn từ Topic đã đăng ký
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("\n[MQTT] Message arrived on topic: ");
-  Serial.println(topic);
+// --- BIẾN TOÀN CỤC CHO LOGIC HANDSHAKE ---
+String currentTarget = ""; // Lưu điểm đích backend gửi (VD: "1,2")
+bool isMoving = false;     // Trạng thái đang thực hiện lệnh đi tới điểm
 
-  Serial.print("[MQTT] Content: ");
-  // In nội dung tin nhắn ra Serial
-  String message = "";
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-    message += (char)payload[i];
-  }
-  Serial.println();
-  
-  // Ví dụ: Nếu muốn xử lý chuỗi message sau này thì code ở đây
-  // if (message == "OPEN") { ... }
+// ==========================================================
+// HÀM: GỬI TRẠNG THÁI OK
+// ==========================================================
+void publishOk(String pos) {
+    // JSON: { "status": "OK", ... } để Backend biết đã đến nơi
+    String payload = "{\"device_id\":\"" + String(MQTT_CLIENT_ID) + "\",\"position\":\"" + pos + "\",\"status\":\"OK\"}";
+    
+    // Gửi lên topic publish (matrix_position)
+    client.publish(MQTT_TOPIC_PUBLISH, payload.c_str());
 }
 
 // ==========================================================
-// HÀM: KẾT NỐI WIFI
+// HÀM: CALLBACK (NHẬN LỆNH TỪ AWS)
+// ==========================================================
+void callback(char* topic, byte* payload, unsigned int length) {
+  // Serial.print("\n[MQTT] Msg: "); Serial.println(topic); // Debug nếu cần
+
+  StaticJsonDocument<1024> doc; 
+  DeserializationError error = deserializeJson(doc, payload, length);
+
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+
+  const char* type = doc["type"]; 
+
+  // --- XỬ LÝ LỆNH TỪNG BƯỚC (STEP) ---
+  if (strcmp(type, "STEP") == 0) {
+    const char* target = doc["target"];
+    currentTarget = String(target);
+    isMoving = true;
+
+    // --- LOG YÊU CẦU ---
+    Serial.print("da nhan duoc vi tri tu AWS: ");
+    Serial.println(currentTarget);
+    Serial.println("dang trong qua trinh di toi diem do ...");
+    
+    // TODO: Viết code điều khiển motor chạy theo Line/PID tại đây
+    
+  } else if (strcmp(type, "CONTROL") == 0) {
+    const char* cmd = doc["value"];
+    Serial.print("Lệnh điều khiển: "); Serial.println(cmd);
+  }
+}
+
+// ==========================================================
+// HÀM: KẾT NỐI WIFI & AWS (GIỮ NGUYÊN)
 // ==========================================================
 void connectWiFi() {
   Serial.print("Dang ket noi WiFi: ");
   Serial.println(WIFI_SSID); 
-
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
   unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(300);
     Serial.print(".");
     if (millis() - start > 30000) {
-      Serial.println("\nWiFi Timeout. Reconnecting...");
-      WiFi.disconnect();
-      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-      start = millis();
+      WiFi.disconnect(); WiFi.begin(WIFI_SSID, WIFI_PASSWORD); start = millis();
     }
   }
   Serial.println("\nWiFi Connected! IP: " + WiFi.localIP().toString());
 }
 
-// ==========================================================
-// HÀM: KẾT NỐI AWS IOT
-// ==========================================================
 bool reconnectMqtt() {
   Serial.println("Dang ket noi AWS IoT...");
-  
-  // Nạp chứng chỉ
   net.setCACert(AWS_ROOT_CA);
   net.setCertificate(DEVICE_CERT);
   net.setPrivateKey(DEVICE_PRIVATE_KEY);
-  
   client.setServer(AWS_IOT_ENDPOINT, 8883);
-  client.setCallback(callback); // <-- QUAN TRỌNG: Đăng ký hàm nhận dữ liệu
-  client.setBufferSize(4096); 
+  client.setCallback(callback); 
+  client.setBufferSize(4096);   
 
   if (client.connect(MQTT_CLIENT_ID)) {
     Serial.println("AWS IoT Connected!");
-    
-    // <-- QUAN TRỌNG: Đăng ký lắng nghe Topic
-    if(client.subscribe(MQTT_TOPIC_SUBSCRIBE)) {
-        Serial.println("Subscribed to: " + String(MQTT_TOPIC_SUBSCRIBE));
-    } else {
-        Serial.println("Subscribe Failed!");
-    }
-    
+    // Subscribe topic nhận lệnh
+    client.subscribe(MQTT_TOPIC_SUBSCRIBE); 
     return true;
   }
-  
-  Serial.print("Failed, rc=");
-  Serial.println(client.state());
+  Serial.print("Failed, rc="); Serial.println(client.state());
   return false;
 }
 
-// ==========================================================
-// HÀM: GỬI DỮ LIỆU
-// ==========================================================
 void publishData(String data) {
   if (!client.connected()) return;
-  
+  // Gửi vị trí thông thường (không có status OK)
   String payload = "{\"device_id\":\"" + String(MQTT_CLIENT_ID) + "\",\"position\":\"" + data + "\"}";
-  Serial.println("Publishing: " + payload);
-  
-  if (client.publish(MQTT_TOPIC_PUBLISH, payload.c_str())) {
-    Serial.println("-> Success");
-  } else {
-    Serial.println("-> Fail");
-  }
+  client.publish(MQTT_TOPIC_PUBLISH, payload.c_str());
 }
 
 // ==========================================================
-// SETUP
+// SETUP & LOOP
 // ==========================================================
 void setup() {
   Serial.begin(115200);
-  
-  // Khởi tạo GM65
   SerialGM65.begin(BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
-  
   delay(100);
   Serial.println("\n=== SYSTEM START ===");
-  
   connectWiFi();
-  
-  // Setup ban đầu cho Client
   net.setCACert(AWS_ROOT_CA);
   net.setCertificate(DEVICE_CERT);
   net.setPrivateKey(DEVICE_PRIVATE_KEY);
   client.setServer(AWS_IOT_ENDPOINT, 8883);
-  client.setCallback(callback); // Đăng ký callback ngay từ setup
+  client.setCallback(callback);
 }
 
-// ==========================================================
-// LOOP
-// ==========================================================
 void loop() {
-  // 1. Kiểm tra WiFi
-  if (WiFi.status() != WL_CONNECTED) {
-    connectWiFi();
-  }
-
-  // 2. Kiểm tra MQTT
+  if (WiFi.status() != WL_CONNECTED) connectWiFi();
   if (!client.connected()) {
     long now = millis();
     if (now - lastReconnectAttempt > 5000) {
       lastReconnectAttempt = now;
-      if (reconnectMqtt()) {
-        lastReconnectAttempt = 0;
-      }
+      if (reconnectMqtt()) lastReconnectAttempt = 0;
     }
   } else {
-    client.loop(); // <-- Hàm này cực quan trọng để nhận dữ liệu về
+    client.loop();
   }
 
-  // 3. Đọc Barcode từ GM65
+  // 3. Đọc Barcode
   if (SerialGM65.available()) {
     String barcode = SerialGM65.readStringUntil('\n');
     barcode.trim(); 
     
     if (barcode.length() > 0) {
-      Serial.println("GM65 Scanned: " + barcode);
-      publishData(barcode);
+      // Logic kiểm tra xem có đúng điểm đích không
+      if (isMoving && barcode == currentTarget) {
+          // --- LOG YÊU CẦU ---
+          Serial.println("da den duoc diem do");
+          Serial.println("Ok");
+
+          // Gửi OK lên AWS
+          publishOk(barcode);
+
+          // Reset trạng thái
+          isMoving = false;
+          currentTarget = "";
+      } else {
+          // Quét được QR khác hoặc đang đi tự do -> cập nhật vị trí lên web thôi
+          Serial.println("GM65 Scanned: " + barcode);
+          publishData(barcode);
+      }
     }
   }
-  
   delay(10); 
 }
