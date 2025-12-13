@@ -3,14 +3,15 @@
 
 #include <pgmspace.h>
 
-const char* WIFI_SSID = "Qiu 2";
-const char* WIFI_PASSWORD = "99999999";
+// Thêm 'static' để tránh lỗi trùng lặp khi include ở nhiều file
+static const char* WIFI_SSID = "Qiu 2";
+static const char* WIFI_PASSWORD = "99999999";
 
-const char* AWS_IOT_ENDPOINT = "a33b04z4mm5umj-ats.iot.us-east-1.amazonaws.com"; 
-const char* MQTT_CLIENT_ID = "ESP32_GM65_Client_01";
+static const char* AWS_IOT_ENDPOINT = "a33b04z4mm5umj-ats.iot.us-east-1.amazonaws.com"; 
+static const char* MQTT_CLIENT_ID = "ESP32_GM65_Client_01";
 
-// ... (Copy toàn bộ 3 cái Certificate dài dòng của bạn vào đây như cũ) ...
-const char* AWS_ROOT_CA =
+// Chứng chỉ AWS Root CA
+static const char* AWS_ROOT_CA =
 "-----BEGIN CERTIFICATE-----\n"
 "MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF\n"
 "ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6\n"
@@ -32,7 +33,8 @@ const char* AWS_ROOT_CA =
 "rqXRfboQnoZsG4q5WTP468SQvvG5\n"
 "-----END CERTIFICATE-----\n";
 
-const char* DEVICE_CERT =
+// Chứng chỉ Device Certificate
+static const char* DEVICE_CERT =
 "-----BEGIN CERTIFICATE-----\n"
 "MIIDWTCCAkGgAwIBAgIUfI0vemDYUXl0wbyLAYKZStO+zg4wDQYJKoZIhvcNAQEL\n"
 "BQAwTTFLMEkGA1UECwxCQW1hem9uIFdlYiBTZXJ2aWNlcyBPPUFtYXpvbi5jb20g\n"
@@ -54,7 +56,8 @@ const char* DEVICE_CERT =
 "wzzw7AQuKFcB6SYxAQpWccwqYS4cEAr33+x70f9KY6IDzkkWzl4Ha98pOAgt\n"
 "-----END CERTIFICATE-----\n";
 
-const char* DEVICE_PRIVATE_KEY =
+// Khóa riêng tư (Private Key)
+static const char* DEVICE_PRIVATE_KEY =
 "-----BEGIN RSA PRIVATE KEY-----\n"
 "MIIEpAIBAAKCAQEAo9CALH+7gTBmB/kUh1fT9UOo7bR2mBiKjcRfi8a8e6MiS6gx\n"
 "S1STvdxAN+hX0aE/W3cB111m17ORg3VXHxzuQGB/dbFRgGW4/YZBzSDayP53K4q1\n"
