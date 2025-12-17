@@ -12,5 +12,5 @@ struct ScannerMessage {
 
 // Khai báo Queue dùng chung (định nghĩa thực tế nằm ở main.cpp)
 extern QueueHandle_t scannerQueue;
-
+extern char currentTarget[64];
 #endif
