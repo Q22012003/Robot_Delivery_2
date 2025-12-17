@@ -1,3 +1,4 @@
+// SharedData.h
 #ifndef SHARED_DATA_H
 #define SHARED_DATA_H
 
@@ -5,12 +6,22 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-// Định nghĩa cấu trúc dữ liệu gửi vào hàng đợi (Queue)
 struct ScannerMessage {
-    char barcode[64]; // Độ dài tối đa của barcode
+    char barcode[64];
 };
 
-// Khai báo Queue dùng chung (định nghĩa thực tế nằm ở main.cpp)
+// Định nghĩa các lệnh di chuyển
+enum RobotCommand {
+    CMD_STOP,
+    CMD_FORWARD,
+    CMD_TURN_LEFT,
+    CMD_TURN_RIGHT
+};
+
 extern QueueHandle_t scannerQueue;
 extern char currentTarget[64];
+
+// [THÊM] Biến toàn cục chia sẻ lệnh di chuyển (Atomic hoặc dùng Queue cũng được, ở đây dùng biến cho đơn giản)
+extern volatile RobotCommand currentCommand; 
+
 #endif
