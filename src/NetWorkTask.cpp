@@ -11,7 +11,18 @@
 WiFiClientSecure net;
 PubSubClient client(net);
 
-// Hàm xử lý dữ liệu nhận từ AWS (Server gửi xuống)
+
+// Hàm hỗ trợ nháy đèn (Block code)
+void blinkLED(int delayTime) {
+    digitalWrite(2, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(delayTime));
+    digitalWrite(2, LOW);
+    vTaskDelay(pdMS_TO_TICKS(delayTime));
+}
+
+// --------------------------------------------------------------------------
+// 1. XỬ LÝ LỆNH TỪ AWS GỬI XUỐNG (STEP)
+// --------------------------------------------------------------------------
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
     String message = "";
     for (int i = 0; i < length; i++) {
@@ -21,8 +32,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.print("[MQTT] Received: ");
     Serial.println(message);
 
-    // Parse JSON để lấy Target và Direction
-    StaticJsonDocument<512> doc; // Tăng size buffer lên chút cho an toàn
+    StaticJsonDocument<512> doc;
     DeserializationError error = deserializeJson(doc, message);
 
     if (!error) {
@@ -30,39 +40,51 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         
         // --- TRƯỜNG HỢP 1: LỆNH DI CHUYỂN (STEP) ---
         if (type && strcmp(type, "STEP") == 0) {
+            const char* dir = doc["direction"]; 
             const char* target = doc["target"];
-            const char* dir = doc["direction"]; // "FORWARD", "LEFT", "RIGHT"
-            
-            // 1. Cập nhật Target (để Scanner check khi tới nơi)
+
+            // Cập nhật mục tiêu mới (VD: "2,2")
             if (target) {
                 strncpy(currentTarget, target, sizeof(currentTarget) - 1);
                 currentTarget[sizeof(currentTarget) - 1] = '\0';
             }
 
-            // 2. Cập nhật Lệnh điều khiển cho LineTask chạy
             if (dir) {
-                if (strcmp(dir, "FORWARD") == 0) {
-                    currentCommand = CMD_FORWARD;
-                } 
-                else if (strcmp(dir, "LEFT") == 0) {
-                    currentCommand = CMD_TURN_LEFT;
+                // A. Gửi xác nhận "CMD_OK" lên AWS ngay lập tức
+                // Để Server biết xe đã nhận lệnh và đang chuẩn bị chạy
+                String ackPayload = "{\"device_id\":\"" + String(MQTT_CLIENT_ID) + 
+                                    "\",\"status\":\"CMD_OK\"," + 
+                                    "\"received_dir\":\"" + String(dir) + "\"}";
+                client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
+
+                // B. Delay 1.5s - 2s (Thời gian chờ ra quyết định/ổn định xe)
+                Serial.println("=> Command Received. Waiting 1.5s to execute...");
+                // vTaskDelay(pdMS_TO_TICKS(1500)); 
+
+                // C. Thực thi lệnh
+                if (strcmp(dir, "LEFT") == 0) {
+                    Serial.println("=> ACTION: TURN LEFT");
+                    currentCommand = CMD_TURN_LEFT; 
                 } 
                 else if (strcmp(dir, "RIGHT") == 0) {
-                    currentCommand = CMD_TURN_RIGHT;
+                    Serial.println("=> ACTION: TURN RIGHT");
+                    currentCommand = CMD_TURN_RIGHT; 
+                }
+                else if (strcmp(dir, "FORWARD") == 0) {
+                    Serial.println("=> ACTION: GO STRAIGHT");
+                    xQueueReset(scannerQueue);
+                    currentCommand = CMD_FORWARD;
                 }
                 else {
-                    // Mặc định nếu lệnh lạ thì dừng cho an toàn
                     currentCommand = CMD_STOP; 
                 }
             }
-            
-            Serial.printf(">>> UPDATE: Target=%s | Cmd=%s\n", currentTarget, dir);
         }
-        // --- TRƯỜNG HỢP 2: LỆNH DỪNG (STOP) ---
+        // --- TRƯỜNG HỢP 2: LỆNH DỪNG KHẨN CẤP (STOP) ---
         else if (type && strcmp(type, "STOP") == 0) {
-             currentCommand = CMD_STOP; // Ngắt motor ngay lập tức
-             strcpy(currentTarget, ""); // Xóa target
-             Serial.println(">>> STOP COMMAND RECEIVED");
+             currentCommand = CMD_STOP;
+             Serial.println("=> Command: STOP");
+             client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOPPED_EMERGENCY\"}");
         }
     } else {
         Serial.print("Error parsing JSON: ");
@@ -73,13 +95,19 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 void connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) return;
     Serial.print("Connecting WiFi...");
+    
     WiFi.mode(WIFI_STA);
+    
+    // [THÊM DÒNG NÀY] Giảm công suất WiFi xuống 8.5dBm (Mặc định là 20dBm rất tốn điện)
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); 
+    
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
         vTaskDelay(pdMS_TO_TICKS(500));
+        blinkLED(100);
         Serial.print(".");
     }
-    Serial.println("\nWiFi Connected");
+    Serial.println("\nWiFi Connected (Low Power Mode)");
 }
 
 void connectAWS() {
@@ -95,59 +123,65 @@ void connectAWS() {
         if (client.connect(MQTT_CLIENT_ID)) {
             Serial.println("AWS Connected!");
             client.subscribe(MQTT_TOPIC_SUBSCRIBE);
+            digitalWrite(2, HIGH);
         } else {
             Serial.print(".");
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            // [THÊM] Nháy đèn nhanh để báo đang cố kết nối
+            blinkLED(500); 
         }
     }
 }
 
+// --------------------------------------------------------------------------
+// 2. VÒNG LẶP CHÍNH CỦA NETWORK TASK
+// --------------------------------------------------------------------------
 void TaskNetwork(void *pvParameters) {
+    digitalWrite(2, LOW);
     connectWiFi();
     connectAWS();
 
     ScannerMessage incomingMsg;
 
     for (;;) {
-        // Duy trì kết nối
         if (WiFi.status() != WL_CONNECTED) connectWiFi();
         if (!client.connected()) connectAWS();
+        // Nếu đã kết nối OK, Đèn phải SÁNG LIÊN TỤC
+        if (WiFi.status() == WL_CONNECTED && client.connected()) {
+             digitalWrite(2, HIGH);
+        }
         client.loop();
 
-        // Kiểm tra dữ liệu từ Scanner gửi sang
         if (xQueueReceive(scannerQueue, &incomingMsg, pdMS_TO_TICKS(10)) == pdTRUE) {
             
             String scannedPos = String(incomingMsg.barcode);
             Serial.print("[SCANNER] Read: " + scannedPos);
 
-            // Kiểm tra xem mã quét được có đúng là đích đến hiện tại không
             bool isCorrect = false;
-            if (strcmp(currentTarget, "") != 0) { // Nếu đang có target
+            if (strcmp(currentTarget, "") != 0) { 
                 if (scannedPos.equals(String(currentTarget))) {
-                    Serial.println(" -> [MATCH] REACHED TARGET!");
+                    Serial.println(" -> [MATCH] REACHED TARGET! STOPPING.");
+                    currentCommand = CMD_STOP; 
+                    strcpy(currentTarget, ""); 
                     isCorrect = true;
-                    
-                    // Nếu đã tới đích, có thể tạm dừng xe để chờ lệnh mới từ Server
-                    // currentCommand = CMD_STOP; // (Bỏ comment dòng này nếu muốn xe dừng hẳn khi quét trúng)
                 } else {
                     Serial.printf(" -> [INFO] Passing node %s (Target: %s)\n", scannedPos.c_str(), currentTarget);
                 }
             }
 
-            // Gửi dữ liệu vị trí lên AWS
-            String statusStr = isCorrect ? "ARRIVED" : "MOVING";
+            // --- SỬA Ở ĐÂY ---
+            // Cũ: String statusStr = isCorrect ? "ARRIVED" : "MOVING";
+            // Mới: Đổi thành "OK" để khớp với Backend Node.js
+            String statusStr = isCorrect ? "OK" : "MOVING"; 
             
             String payload = "{\"device_id\":\"" + String(MQTT_CLIENT_ID) + 
                              "\",\"position\":\"" + scannedPos + 
                              "\",\"status\":\"" + statusStr + "\"}"; 
             
-            if(client.publish(MQTT_TOPIC_PUBLISH, payload.c_str())){
-                 Serial.println("[NETWORK] Pos Uploaded.");
-            } else {
-                 Serial.println("[NETWORK] Upload Failed.");
+            if (client.publish(MQTT_TOPIC_PUBLISH, payload.c_str())) {
+                Serial.println("[NETWORK] Sent status: " + statusStr);
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10)); // Nhường CPU
+        vTaskDelay(pdMS_TO_TICKS(10)); 
     }
 }

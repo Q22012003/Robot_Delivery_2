@@ -3,124 +3,217 @@
 #include "Config.h"
 #include "SharedData.h"
 
-// Biến cho PID
-int lastError = 0;
+// Biến PID & Sensor
+float error = 0, previous_error = 0;
+float integral = 0;
+int mask = 0;
+int currentSpeedL = 0;
+int currentSpeedR = 0;
+
+// Mapping sensor pins
+const int sensor_pins[NUM_SENSORS] = {SENSOR_1, SENSOR_2, SENSOR_3, SENSOR_4, SENSOR_5};
 
 void setupMotors() {
+    // Cấu hình toàn bộ chân điều khiển motor là OUTPUT
+    pinMode(MOTOR_R_IN1, OUTPUT);
+    pinMode(MOTOR_R_IN2, OUTPUT);
+    pinMode(MOTOR_R_PWM, OUTPUT);
+
     pinMode(MOTOR_L_IN1, OUTPUT);
     pinMode(MOTOR_L_IN2, OUTPUT);
     pinMode(MOTOR_L_PWM, OUTPUT);
-    pinMode(MOTOR_R_IN3, OUTPUT);
-    pinMode(MOTOR_R_IN4, OUTPUT);
-    pinMode(MOTOR_R_PWM, OUTPUT);
 }
 
 void setupSensors() {
-    pinMode(SENSOR_1, INPUT);
-    pinMode(SENSOR_2, INPUT);
-    pinMode(SENSOR_3, INPUT);
-    pinMode(SENSOR_4, INPUT);
-    pinMode(SENSOR_5, INPUT);
+    for (int i = 0; i < NUM_SENSORS; i++) {
+        pinMode(sensor_pins[i], INPUT);
+    }
 }
 
-// Hàm điều khiển motor cơ bản
-void setMotorSpeed(int leftSpeed, int rightSpeed) {
+// Hàm điều khiển motor an toàn (Đã fix lỗi GPIO error)
+void setMotorSpeed(int targetL, int targetR) {
+    // Giới hạn target
+    targetL = constrain(targetL, -255, 255);
+    targetR = constrain(targetR, -255, 255);
+
+    // --- LOGIC MỚI: TĂNG TỐC TỪ TỪ (RAMPING) ---
+    // Thay vì set cái rụp, ta nhích từ từ mỗi lần gọi hàm (nếu thay đổi quá lớn)
+    // Nếu chênh lệch > 20 pwm, chỉ tăng/giảm 20 đơn vị thôi
+    
+    if (targetL > currentSpeedL + 20) currentSpeedL += 20;
+    else if (targetL < currentSpeedL - 20) currentSpeedL -= 20;
+    else currentSpeedL = targetL; // Nếu gần tới rồi thì gán luôn
+
+    if (targetR > currentSpeedR + 20) currentSpeedR += 20;
+    else if (targetR < currentSpeedR - 20) currentSpeedR -= 20;
+    else currentSpeedR = targetR;
+
+    // --- GHI RA MOTOR (Dùng biến currentSpeed thay vì target) ---
+    
     // Motor Trái
-    if (leftSpeed >= 0) {
-        digitalWrite(MOTOR_L_IN1, HIGH);
-        digitalWrite(MOTOR_L_IN2, LOW);
-    } else {
+    if (currentSpeedL >= 0) {
         digitalWrite(MOTOR_L_IN1, LOW);
         digitalWrite(MOTOR_L_IN2, HIGH);
-        leftSpeed = -leftSpeed;
+        analogWrite(MOTOR_L_PWM, currentSpeedL);
+    } else {
+        digitalWrite(MOTOR_L_IN1, HIGH);
+        digitalWrite(MOTOR_L_IN2, LOW);
+        analogWrite(MOTOR_L_PWM, -currentSpeedL);
     }
-    analogWrite(MOTOR_L_PWM, constrain(leftSpeed, 0, 255));
 
     // Motor Phải
-    if (rightSpeed >= 0) {
-        digitalWrite(MOTOR_R_IN3, HIGH);
-        digitalWrite(MOTOR_R_IN4, LOW);
+    if (currentSpeedR >= 0) {
+        digitalWrite(MOTOR_R_IN1, LOW);
+        digitalWrite(MOTOR_R_IN2, HIGH);
+        analogWrite(MOTOR_R_PWM, currentSpeedR);
     } else {
-        digitalWrite(MOTOR_R_IN3, LOW);
-        digitalWrite(MOTOR_R_IN4, HIGH);
-        rightSpeed = -rightSpeed;
+        digitalWrite(MOTOR_R_IN1, HIGH);
+        digitalWrite(MOTOR_R_IN2, LOW);
+        analogWrite(MOTOR_R_PWM, -currentSpeedR);
     }
-    analogWrite(MOTOR_R_PWM, constrain(rightSpeed, 0, 255));
 }
 
-// Đọc cảm biến và tính sai số (-2 đến 2)
-int getError() {
-    int s1 = digitalRead(SENSOR_1);
-    int s2 = digitalRead(SENSOR_2);
-    int s3 = digitalRead(SENSOR_3);
-    int s4 = digitalRead(SENSOR_4);
-    int s5 = digitalRead(SENSOR_5);
+float getSensor() {
+    mask = 0;
+    for (int i = 0; i < NUM_SENSORS; i++) {
+        mask = (mask << 1) | digitalRead(sensor_pins[i]);
+    }
 
-    // Giả sử Line là Mức 1 (HIGH). Nếu Line là mức 0 thì đảo ngược logic.
-    // Logic trọng số: Trái < 0, Phải > 0, Giữa = 0
-    if (s1) return -2; // Lệch trái nhiều
-    if (s2) return -1; // Lệch trái ít
-    if (s3) return 0;  // Giữa
-    if (s4) return 1;  // Lệch phải ít
-    if (s5) return 2;  // Lệch phải nhiều
-    
-    return lastError; // Mất line thì giữ sai số cũ
+    // Map bitmask sang error (Logic 0: Line, 1: Nền)
+    switch (mask) {
+        case 0b11110: error = -4; break; 
+        case 0b11100: error = -3; break;
+        case 0b11101: error = -2; break;
+        case 0b11001: error = -1; break;
+        case 0b11011: error = 0;  break; // Giữa
+        case 0b10011: error = 1;  break;
+        case 0b10111: error = 2;  break;
+        case 0b00111: error = 3;  break;
+        case 0b01111: error = 4;  break; 
+        case 0b11111: 
+            if (error > 0) error = 5; else error = -5; // Mất line
+            break;
+        case 0b00000: error = 0; break; // Ngã tư
+        default: break; 
+    }
+    return error;
+}
+
+float calculatePID() {
+    integral += error;
+    integral = constrain(integral, -100, 100); 
+    float pid = (PID_KP * error) + (PID_KD * (error - previous_error)) + (PID_KI * integral);
+    previous_error = error;
+    return pid;
+}
+
+void turnLeftSmart() {
+    Serial.println(">>> SMART TURN LEFT");
+    setMotorSpeed(0, 0);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Đi thẳng chút xíu để lọt tâm xe
+    setMotorSpeed(100, 100); 
+    vTaskDelay(pdMS_TO_TICKS(200)); 
+
+    // Quay trái tại chỗ
+    setMotorSpeed(-TURN_SPEED_HIGH, TURN_SPEED_HIGH);
+    vTaskDelay(pdMS_TO_TICKS(150)); // Thoát line cũ
+
+    long startTime = millis();
+    while (true) {
+        if (digitalRead(SENSOR_3) == 0) { // Mắt giữa gặp line
+            setMotorSpeed(-50, 50); // Phanh nghịch
+            vTaskDelay(pdMS_TO_TICKS(50));
+            setMotorSpeed(0, 0);
+            break;
+        }
+        if (millis() - startTime > 2000) break;
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    error = 0; integral = 0;
+}
+
+void turnRightSmart() {
+    Serial.println(">>> SMART TURN RIGHT");
+    setMotorSpeed(0, 0);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    setMotorSpeed(100, 100);
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // Quay phải tại chỗ
+    setMotorSpeed(TURN_SPEED_HIGH, -TURN_SPEED_HIGH);
+    vTaskDelay(pdMS_TO_TICKS(150)); 
+
+    long startTime = millis();
+    while (true) {
+        if (digitalRead(SENSOR_3) == 0) {
+            setMotorSpeed(50, -50); 
+            vTaskDelay(pdMS_TO_TICKS(50));
+            setMotorSpeed(0, 0);
+            break;
+        }
+        if (millis() - startTime > 2000) break;
+        vTaskDelay(pdMS_TO_TICKS(5)); 
+    }
+    error = 0; integral = 0;
 }
 
 void TaskLine(void *pvParameters) {
     setupMotors();
     setupSensors();
+    
+    // Log xác nhận khởi động
+    Serial.println("[LineTask] Started. Waiting for command...");
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
     for (;;) {
-        // Kiểm tra lệnh từ SharedData
-        switch (currentCommand) {
-            case CMD_STOP:
-                setMotorSpeed(0, 0);
-                break;
-
-            case CMD_TURN_LEFT:
-                Serial.println(">>> TURNING LEFT (90 Degree)...");
-                // Quay tại chỗ: Trái lùi, Phải tiến
-                setMotorSpeed(-TURN_SPEED, TURN_SPEED); 
-                vTaskDelay(pdMS_TO_TICKS(TURN_90_TIME)); // Chờ quay xong
-                
-                // Quay xong thì dừng hoặc tự động chuyển sang dò line
-                setMotorSpeed(0, 0);
-                vTaskDelay(pdMS_TO_TICKS(100)); // Dừng nghỉ xíu cho đỡ trượt
-                
-                currentCommand = CMD_FORWARD; // [QUAN TRỌNG] Tự chuyển về chế độ dò line
-                break;
-
-            case CMD_TURN_RIGHT:
-                Serial.println(">>> TURNING RIGHT (90 Degree)...");
-                // Quay tại chỗ: Trái tiến, Phải lùi
-                setMotorSpeed(TURN_SPEED, -TURN_SPEED);
-                vTaskDelay(pdMS_TO_TICKS(TURN_90_TIME)); 
-
-                setMotorSpeed(0, 0);
-                vTaskDelay(pdMS_TO_TICKS(100));
-
-                currentCommand = CMD_FORWARD; // Tự chuyển về chế độ dò line
-                break;
-
-            case CMD_FORWARD:
-                // Logic PID Dò Line
-                int error = getError();
-                
-                // Tính toán PID
-                int P = error;
-                int D = error - lastError;
-                int correction = (KP * P) + (KD * D);
-                
-                lastError = error;
-
-                int speedLeft = BASE_SPEED + correction;
-                int speedRight = BASE_SPEED - correction;
-
-                setMotorSpeed(speedLeft, speedRight);
-                break;
+        // --- [DEBUG SENSOR] ---
+        // In ra giá trị 5 cảm biến mỗi 200ms
+        // Format: [1] [2] [3] [4] [5] (VD: 1 1 0 1 1)
+        // static unsigned long lastDebugTime = 0;
+        // if (millis() - lastDebugTime > 200) { 
+        //     lastDebugTime = millis();
+        //     Serial.printf("Sensors (1-5): %d %d %d %d %d\n", 
+        //         digitalRead(SENSOR_1), 
+        //         digitalRead(SENSOR_2), 
+        //         digitalRead(SENSOR_3), 
+        //         digitalRead(SENSOR_4), 
+        //         digitalRead(SENSOR_5));
+        // }
+        // 1. Dừng
+        if (currentCommand == CMD_STOP) {
+            setMotorSpeed(0, 0);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10)); // Chu kỳ PID (10ms là ổn)
+        // 2. Quay
+        if (currentCommand == CMD_TURN_LEFT) {
+            turnLeftSmart();
+            currentCommand = CMD_FORWARD; 
+        }
+        else if (currentCommand == CMD_TURN_RIGHT) {
+            turnRightSmart();
+            currentCommand = CMD_FORWARD; 
+        }
+        
+        // 3. Chạy thẳng PID
+        if (currentCommand == CMD_FORWARD) {
+            getSensor(); 
+            float pid_value = calculatePID();
+            int leftSpeed = START_SPEED - pid_value; 
+           int rightSpeed = START_SPEED + pid_value;
+            leftSpeed = constrain(leftSpeed, 0, MAX_SPEED);
+            rightSpeed = constrain(rightSpeed, 0, MAX_SPEED);
+            
+            setMotorSpeed(leftSpeed, rightSpeed);
+
+            // Debug tạm thời (Xóa sau khi xe chạy ok)
+            // Serial.printf("Cmd:Fwd | L:%d R:%d | Err:%.1f\n", leftSpeed, rightSpeed, error);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

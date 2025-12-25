@@ -2,45 +2,51 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// --- Cấu hình GM65 ---
+// --- 1. Cấu hình GM65 (QR Code) ---
+// LƯU Ý: Phải đổi sang chân khác vì 16, 17 đã dùng cho Sensor
 #define RX_PIN 16 
 #define TX_PIN 17
-#define GM65_BAUD_RATE 9600
+#define GM65_BAUD_RATE 115200
 
-// --- Cấu hình 5 Mắt Dò Line (INPUT) ---
-// Giả sử 0 là gặp Line (Đen), 1 là nền (Trắng) hoặc ngược lại tùy cảm biến
-#define SENSOR_1 32 // Trái cùng
-#define SENSOR_2 33
-#define SENSOR_3 25 // Giữa
-#define SENSOR_4 26
-#define SENSOR_5 27 // Phải cùng
+// --- 2. Cấu hình 5 Mắt Dò Line (INPUT) ---
+// Thứ tự: {16, 17, 5, 18, 19}
+#define SENSOR_1 19 // Trái cùng
+#define SENSOR_2 18
+#define SENSOR_3 5  // Giữa
+#define SENSOR_4 22
+#define SENSOR_5 23 // Phải cùng
+#define NUM_SENSORS 5
 
-// --- Cấu hình Động Cơ (L298N hoặc tương tự) ---
-// Motor A (Trái)
-#define MOTOR_L_IN1 18
-#define MOTOR_L_IN2 19
-#define MOTOR_L_PWM 5 
+// --- 3. Cấu hình Động Cơ (OUTPUT) ---
+// Right Motor (EnA) - InA (35), InB (32)
+// LƯU Ý: GPIO 35 trên ESP32 thường là INPUT ONLY. Kiểm tra kỹ nếu bánh phải không chạy.
+#define MOTOR_R_PWM 26 
+#define MOTOR_R_IN1 4 
+#define MOTOR_R_IN2 32 
 
-// Motor B (Phải)
-#define MOTOR_R_IN3 21
-#define MOTOR_R_IN4 22
-#define MOTOR_R_PWM 23 
+// Left Motor (EnB) - InC (33), InD (25)
+#define MOTOR_L_PWM 27 
+#define MOTOR_L_IN1 33 
+#define MOTOR_L_IN2 25 
 
-// --- Tham số điều khiển ---
-#define BASE_SPEED 150       // Tốc độ cơ bản (0-255)
-#define TURN_SPEED 160       // Tốc độ khi quay cua
-#define TURN_90_TIME 600     // Thời gian quay 90 độ (ms) - CẦN CÂN CHỈNH THỰC TẾ
-#define KP 20                // Hệ số PID (P)
-#define KD 50                // Hệ số PID (D)
+// --- 4. PID & SPEED ---
+#define START_SPEED 85      //Define value < 60 (error motor) 
+#define MAX_SPEED   85      
+#define TURN_SPEED_LOW  150  
+#define TURN_SPEED_HIGH 150  
 
-// --- Cấu hình MQTT ---
+#define PID_KP 11.5
+#define PID_KI 0.0 
+#define PID_KD 3.8
+
+// --- 5. Hệ thống ---
 #define MQTT_TOPIC_PUBLISH "gm65/data/matrix_position"
 #define MQTT_TOPIC_SUBSCRIBE  "gm65/data/command"
+#define MQTT_TOPIC_DEBUG      "gm65/debug"
 
-// --- FreeRTOS ---
 #define QUEUE_LENGTH 10
 #define NETWORK_STACK_SIZE (1024 * 6)
 #define SCANNER_STACK_SIZE (1024 * 4)
-#define LINE_STACK_SIZE    (1024 * 4) // [THÊM] Stack cho dò line
+#define LINE_STACK_SIZE    (1024 * 4)
 
 #endif
