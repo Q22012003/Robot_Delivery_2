@@ -9,6 +9,8 @@ float integral = 0;
 int mask = 0;
 int currentSpeedL = 0;
 int currentSpeedR = 0;
+#define BLIND_TIME_FORWARD 2000  // 2 giây đi thẳng qua ngã tư
+#define BLIND_TIME_TURN    500   // Thời gian thoát khỏi line cũ trước khi quay
 
 // Mapping sensor pins
 const int sensor_pins[NUM_SENSORS] = {SENSOR_1, SENSOR_2, SENSOR_3, SENSOR_4, SENSOR_5};
@@ -183,6 +185,40 @@ void TaskLine(void *pvParameters) {
         //         digitalRead(SENSOR_5));
         // }
         // 1. Dừng
+        // [LOGIC MỚI] XỬ LÝ CHẠY MÙ (BLIND MODE)
+        if (runBlind) {
+            
+            // TRƯỜNG HỢP 1: ĐI THẲNG QUA NGÃ TƯ
+            if (currentCommand == CMD_FORWARD) {
+                Serial.println(">>> BLIND FORWARD (Ignoring Sensors)");
+                
+                // Chạy thẳng với tốc độ ổn định (không PID)
+                setMotorSpeed(START_SPEED, START_SPEED); 
+                
+                // Nhắm mắt chạy trong 2s (hoặc thời gian bạn muốn)
+                vTaskDelay(pdMS_TO_TICKS(BLIND_TIME_FORWARD)); 
+                
+                Serial.println(">>> BLIND END. Switching to PID.");
+            }
+            
+            // TRƯỜNG HỢP 2: RẼ TRÁI/PHẢI
+            // Logic quay của bạn (turnLeftSmart) đã có sẵn delay mù bên trong
+            // nên ta chỉ cần gọi nó, không cần delay thêm ở ngoài quá nhiều.
+            else if (currentCommand == CMD_TURN_LEFT) {
+                turnLeftSmart(); // Hàm này đã tự handle việc quay
+                currentCommand = CMD_FORWARD; // Quay xong thì đi thẳng tiếp
+            }
+            else if (currentCommand == CMD_TURN_RIGHT) {
+                turnRightSmart();
+                currentCommand = CMD_FORWARD;
+            }
+
+            // Sau khi thực hiện xong hành động mù, tắt cờ đi để PID hoạt động lại
+            runBlind = false;
+            
+            // Reset lại bộ đếm PID để tránh bị giật khi vừa bật lại
+            error = 0; previous_error = 0; integral = 0;
+        }
         if (currentCommand == CMD_STOP) {
             setMotorSpeed(0, 0);
             vTaskDelay(pdMS_TO_TICKS(100));

@@ -65,18 +65,22 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
                 if (strcmp(dir, "LEFT") == 0) {
                     Serial.println("=> ACTION: TURN LEFT");
                     currentCommand = CMD_TURN_LEFT; 
+                    runBlind = true; // [THÊM] Báo hiệu quay mù
                 } 
                 else if (strcmp(dir, "RIGHT") == 0) {
                     Serial.println("=> ACTION: TURN RIGHT");
                     currentCommand = CMD_TURN_RIGHT; 
+                    runBlind = true; // [THÊM] Báo hiệu quay mù
                 }
                 else if (strcmp(dir, "FORWARD") == 0) {
                     Serial.println("=> ACTION: GO STRAIGHT");
                     xQueueReset(scannerQueue);
                     currentCommand = CMD_FORWARD;
+                    runBlind = true; // [THÊM] Báo hiệu quay mù
                 }
                 else {
                     currentCommand = CMD_STOP; 
+                    runBlind = true; // [THÊM] Báo hiệu quay mù
                 }
             }
         }
@@ -93,29 +97,47 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 }
 
 void connectWiFi() {
+    const TickType_t timeout = pdMS_TO_TICKS(10000); // 10s
+    TickType_t startTick = xTaskGetTickCount();
+
     if (WiFi.status() == WL_CONNECTED) return;
     Serial.print("Connecting WiFi...");
     
     WiFi.mode(WIFI_STA);
     
-    // [THÊM DÒNG NÀY] Giảm công suất WiFi xuống 8.5dBm (Mặc định là 20dBm rất tốn điện)
-    WiFi.setTxPower(WIFI_POWER_19_5dBm); 
+    //Giảm công suất WiFi xuống 8.5dBm( ) (Mặc định là 20dBm rất tốn điện)
+    wifi_power_t txPower = WIFI_POWER_19_5dBm;
+    WiFi.setTxPower(txPower); 
     
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
+      if ((xTaskGetTickCount() - startTick) > timeout) {
+       Serial.println("\nTime out Wifi Connected");
+       return;
+    }
         vTaskDelay(pdMS_TO_TICKS(500));
         blinkLED(100);
         Serial.print(".");
     }
-    Serial.println("\nWiFi Connected (Low Power Mode)");
+
+    if (txPower == WIFI_POWER_19_5dBm ) {
+      Serial.println("\nWiFi Connected at WIFI_POWER_19_5dBm");
+    }
+    else {
+      Serial.println("\nWiFi Connected low Power Mode"); 
+    }
 }
 
 void connectAWS() {
     net.setCACert(AWS_ROOT_CA);
+    Serial.println("AWS_ROOT_CA Done");
     net.setCertificate(DEVICE_CERT);
+    Serial.println("DEVICE_CERT Done");
     net.setPrivateKey(DEVICE_PRIVATE_KEY);
+    Serial.println("DEVICE_PRIVATE_KEY Done");
 
     client.setServer(AWS_IOT_ENDPOINT, 8883);
+    Serial.println("AWS_IOT_ENDPOINT Done");
     client.setCallback(mqttCallback);
 
     Serial.print("Connecting AWS...");

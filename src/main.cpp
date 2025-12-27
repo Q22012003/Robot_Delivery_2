@@ -12,6 +12,8 @@
 QueueHandle_t scannerQueue;
 char currentTarget[64] = ""; 
 volatile RobotCommand currentCommand = CMD_STOP; 
+// [THÊM] Khởi tạo false
+volatile bool runBlind = false;
 
 void setup() {
     // [THÊM DÒNG NÀY NGAY ĐẦU HÀM SETUP]

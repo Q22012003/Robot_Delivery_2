@@ -23,5 +23,7 @@ extern char currentTarget[64];
 
 // [THÊM] Biến toàn cục chia sẻ lệnh di chuyển (Atomic hoặc dùng Queue cũng được, ở đây dùng biến cho đơn giản)
 extern volatile RobotCommand currentCommand; 
+// [THÊM] Biến cờ báo hiệu chạy mù (Blind Mode)
+extern volatile bool runBlind;
 
 #endif
