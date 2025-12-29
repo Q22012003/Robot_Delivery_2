@@ -1,7 +1,7 @@
 #include "ScannerTask.h"
 #include "Config.h"
 #include "SharedData.h"
-
+#include "DebuggerBLE.h"
 HardwareSerial SerialGM65(2);
 
 // [THÊM] Biến lưu mã cũ để chống trùng
@@ -31,7 +31,9 @@ void TaskScanner(void *pvParameters) {
 
                 if (isNewCode || isTimeout) {
                     
-                    Serial.println("[SCANNER] New Code: " + rawData);
+                    //Serial.println("[SCANNER] New Code: " + rawData);
+                    debug_println("[SCANNER] New Code: " + rawData);
+                    
 
                     // Cập nhật trạng thái
                     lastBarcode = rawData;
@@ -46,7 +48,8 @@ void TaskScanner(void *pvParameters) {
                 } 
                 else {
                     // Debug: In ra để biết nó đang bỏ qua (có thể comment lại cho đỡ rối)
-                     Serial.println("[SCANNER] Ignored duplicate: " + rawData);
+                     //Serial.println("[SCANNER] Ignored duplicate: " + rawData);
+                     debug_println("[SCANNER] Ignored duplicate: " + rawData);
                 }
             }
         }

@@ -2,6 +2,7 @@
 #include "LineTask.h"
 #include "Config.h"
 #include "SharedData.h"
+#include "DebuggerBLE.h"
 
 // Biến PID & Sensor
 float error = 0, previous_error = 0;
@@ -110,7 +111,9 @@ float calculatePID() {
 }
 
 void turnLeftSmart() {
-    Serial.println(">>> SMART TURN LEFT");
+    //Serial.println(">>> SMART TURN LEFT");
+    debug_println(">>> SMART TURN LEFT");
+    
     setMotorSpeed(0, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -137,7 +140,8 @@ void turnLeftSmart() {
 }
 
 void turnRightSmart() {
-    Serial.println(">>> SMART TURN RIGHT");
+    //Serial.println(">>> SMART TURN RIGHT");
+    debug_println(">>> SMART TURN RIGHT");
     setMotorSpeed(0, 0);
     vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -167,7 +171,8 @@ void TaskLine(void *pvParameters) {
     setupSensors();
     
     // Log xác nhận khởi động
-    Serial.println("[LineTask] Started. Waiting for command...");
+   // Serial.println("[LineTask] Started. Waiting for command...");
+    debug_println("[LineTask] Started. Waiting for command...");
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     for (;;) {
@@ -191,14 +196,15 @@ void TaskLine(void *pvParameters) {
             // TRƯỜNG HỢP 1: ĐI THẲNG QUA NGÃ TƯ
             if (currentCommand == CMD_FORWARD) {
                 Serial.println(">>> BLIND FORWARD (Ignoring Sensors)");
-                
+                debug_println(">>> BLIND FORWARD (Ignoring Sensors)");
                 // Chạy thẳng với tốc độ ổn định (không PID)
                 setMotorSpeed(START_SPEED, START_SPEED); 
                 
                 // Nhắm mắt chạy trong 2s (hoặc thời gian bạn muốn)
                 vTaskDelay(pdMS_TO_TICKS(BLIND_TIME_FORWARD)); 
                 
-                Serial.println(">>> BLIND END. Switching to PID.");
+               // Serial.println(">>> BLIND END. Switching to PID.");
+                debug_println(">>> BLIND END. Switching to PID.");
             }
             
             // TRƯỜNG HỢP 2: RẼ TRÁI/PHẢI

@@ -4,6 +4,7 @@
 #include "NetworkTask.h"
 #include "ScannerTask.h"
 #include "LineTask.h"
+#include "DebuggerBLE.h"
 
 // [THÊM 2 DÒNG NÀY ĐỂ TẮT BROWNOUT]
 #include "soc/soc.h"
@@ -23,6 +24,7 @@ void setup() {
     digitalWrite(2, HIGH); // Bật sáng báo hiệu "Đã có điện"
     digitalWrite(2, LOW); // Mặc định tắt
     Serial.begin(115200);
+    setupDebug();
     
     scannerQueue = xQueueCreate(QUEUE_LENGTH, sizeof(ScannerMessage));
     
@@ -32,7 +34,9 @@ void setup() {
     xTaskCreatePinnedToCore(TaskScanner, "ScannerTask", SCANNER_STACK_SIZE, NULL, 1, NULL, 1); 
     xTaskCreatePinnedToCore(TaskLine,    "LineTask",    LINE_STACK_SIZE,    NULL, 2, NULL, 1); 
 
-    Serial.println("All Tasks Started... Brownout Detector DISABLED.");
+    // Serial.println("All Tasks Started... Brownout Detector DISABLED.");
+    debug_printf("All Tasks Started... Brownout Detector DISABLED.\n");
+    debug_printf("System Ready. Waiting for commands...\n");
 }
 
 void loop() {

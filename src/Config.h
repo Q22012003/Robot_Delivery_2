@@ -5,7 +5,7 @@
 // --- 1. Cấu hình GM65 (QR Code) ---
 // LƯU Ý: Phải đổi sang chân khác vì 16, 17 đã dùng cho Sensor
 #define RX_PIN 16 
-#define TX_PIN 17
+#define TX_PIN 17 
 #define GM65_BAUD_RATE 115200
 
 // --- 2. Cấu hình 5 Mắt Dò Line (INPUT) ---
@@ -43,6 +43,11 @@
 #define MQTT_TOPIC_PUBLISH "gm65/data/matrix_position"
 #define MQTT_TOPIC_SUBSCRIBE  "gm65/data/command"
 #define MQTT_TOPIC_DEBUG      "gm65/debug"
+
+// --- 6. Bluetooth Debug ---
+#define DEBUG_RX_PIN 13 // Nối vào TX của HC-05
+#define DEBUG_TX_PIN 14 // Nối vào RX của HC-05
+#define DEBUG_BAUD   9600 // HC-05 thường mặc định là 9600
 
 #define QUEUE_LENGTH 10
 #define NETWORK_STACK_SIZE (1024 * 6)
