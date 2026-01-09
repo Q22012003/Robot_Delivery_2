@@ -30,8 +30,8 @@
 #define MOTOR_L_IN2 25 
 
 // --- 4. PID & SPEED ---
-#define START_SPEED 85      //Define value < 60 (error motor) 
-#define MAX_SPEED   85      
+#define START_SPEED 75      //Define value < 60 (error motor) 
+#define MAX_SPEED   75      
 #define TURN_SPEED_LOW  150  
 #define TURN_SPEED_HIGH 150  
 
@@ -40,8 +40,21 @@
 #define PID_KD 3.8
 
 // --- 5. Hệ thống ---
-#define MQTT_TOPIC_PUBLISH "gm65/data/matrix_position"
-#define MQTT_TOPIC_SUBSCRIBE  "gm65/data/command"
+// Chọn 1 trong 2: set VEHICLE_ID = 1 hoặc 2
+#define VEHICLE_ID 1
+#if (VEHICLE_ID == 1)
+  #define MQTT_CLIENT_ID        "ESP32_GM65_Client_01"
+  #define MQTT_TOPIC_SUBSCRIBE  "car/V1/command"
+  #define MQTT_TOPIC_PUBLISH    "car/V1/matrix_position"
+#elif (VEHICLE_ID == 2)
+  #define MQTT_CLIENT_ID        "ESP32_GM65_Client_02"
+  #define MQTT_TOPIC_SUBSCRIBE  "car/V2/command"
+  #define MQTT_TOPIC_PUBLISH    "car/V2/matrix_position"
+#else
+  #error "Invalid VEHICLE_ID"
+#endif
+
+
 #define MQTT_TOPIC_DEBUG      "gm65/debug"
 
 // --- 6. Bluetooth Debug ---

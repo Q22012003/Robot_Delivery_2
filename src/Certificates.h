@@ -4,8 +4,8 @@
 #include <pgmspace.h>
 
 // Thêm 'static' để tránh lỗi trùng lặp khi include ở nhiều file
-static const char* WIFI_SSID = "Qiu 2";
-static const char* WIFI_PASSWORD = "99999999";
+static const char* WIFI_SSID = "D902_2.4G";
+static const char* WIFI_PASSWORD = "NhaD902@@";
 
 static const char* AWS_IOT_ENDPOINT = "a33b04z4mm5umj-ats.iot.us-east-1.amazonaws.com"; 
 static const char* MQTT_CLIENT_ID = "ESP32_GM65_Client_01";
