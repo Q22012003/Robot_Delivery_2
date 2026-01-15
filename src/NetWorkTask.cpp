@@ -141,13 +141,13 @@ void connectWiFi() {
 }
 
 void connectAWS() {
-    net.setCACert(AWS_ROOT_CA);
+    net.setCACert(AWS_CERT_CA);
     //Serial.println("AWS_ROOT_CA Done");
     debug_printf("AWS_ROOT_CA Done\n");
-    net.setCertificate(DEVICE_CERT);
+    net.setCertificate(AWS_CERT_CRT);
     //Serial.println("DEVICE_CERT Done");
     debug_printf("DEVICE_CERT Dones\n");
-    net.setPrivateKey(DEVICE_PRIVATE_KEY);
+    net.setPrivateKey(AWS_CERT_PRIVATE);
     //Serial.println("DEVICE_PRIVATE_KEY Done");
     debug_printf("DEVICE_PRIVATE_KEY Done\n");
 
