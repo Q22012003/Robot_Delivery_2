@@ -39,20 +39,20 @@
 #define PID_KI 0.0 
 #define PID_KD 3.8
 
-// --- 5. Hệ thống ---
-// Chọn 1 trong 2: set VEHICLE_ID = 1 hoặc 2
-#define VEHICLE_ID 1
-#if (VEHICLE_ID == 1)
-  #define MQTT_CLIENT_ID        "ESP32_GM65_Client_01"
-  #define MQTT_TOPIC_SUBSCRIBE  "car/V1/command"
-  #define MQTT_TOPIC_PUBLISH    "car/V1/matrix_position"
-#elif (VEHICLE_ID == 2)
-  #define MQTT_CLIENT_ID        "ESP32_GM65_Client_02"
-  #define MQTT_TOPIC_SUBSCRIBE  "car/V2/command"
-  #define MQTT_TOPIC_PUBLISH    "car/V2/matrix_position"
-#else
-  #error "Invalid VEHICLE_ID"
-#endif
+// // --- 5. Hệ thống ---
+// // Chọn 1 trong 2: set VEHICLE_ID = 1 hoặc 2
+// #define VEHICLE_ID 1
+// #if (VEHICLE_ID == 1)
+//   #define MQTT_CLIENT_ID        "ESP32_GM65_Client_01"
+//   #define MQTT_TOPIC_SUBSCRIBE  "car/V1/command"
+//   #define MQTT_TOPIC_PUBLISH    "car/V1/matrix_position"
+// #elif (VEHICLE_ID == 2)
+//   #define MQTT_CLIENT_ID        "ESP32_GM65_Client_02"
+//   #define MQTT_TOPIC_SUBSCRIBE  "car/V2/command"
+//   #define MQTT_TOPIC_PUBLISH    "car/V2/matrix_position"
+// #else
+//   #error "Invalid VEHICLE_ID"
+// #endif
 
 
 #define MQTT_TOPIC_DEBUG      "gm65/debug"

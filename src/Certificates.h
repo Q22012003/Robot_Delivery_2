@@ -2,15 +2,15 @@
 #define CERTIFICATES_H
 
 // WiFi
-static const char* WIFI_SSID = "D902_2.4G";
-static const char* WIFI_PASSWORD = "NhaD902@@";
+static const char* WIFI_SSID = "Qiu 2";
+static const char* WIFI_PASSWORD = "99999999";
 
 // AWS IoT endpoint
 static const char* AWS_IOT_ENDPOINT = "a33b04z4mm5umj-ats.iot.us-east-1.amazonaws.com";
 
 
 #ifndef VEHICLE_ID 
-  #define VEHICLE_ID 1
+  #define VEHICLE_ID 2
 #endif
 
 #if (VEHICLE_ID == 1)
