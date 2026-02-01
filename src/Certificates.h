@@ -2,7 +2,7 @@
 #define CERTIFICATES_H
 
 // WiFi
-static const char* WIFI_SSID = "Qiu 2";
+static const char* WIFI_SSID = "MINH QUI";
 static const char* WIFI_PASSWORD = "99999999";
 
 // AWS IoT endpoint

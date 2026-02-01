@@ -10,20 +10,35 @@ struct ScannerMessage {
     char barcode[64];
 };
 
-// Định nghĩa các lệnh di chuyển
 enum RobotCommand {
     CMD_STOP,
     CMD_FORWARD,
     CMD_TURN_LEFT,
-    CMD_TURN_RIGHT
+    CMD_TURN_RIGHT,
+    CMD_BACK   
 };
 
 extern QueueHandle_t scannerQueue;
 extern char currentTarget[64];
-
-// [THÊM] Biến toàn cục chia sẻ lệnh di chuyển (Atomic hoặc dùng Queue cũng được, ở đây dùng biến cho đơn giản)
 extern volatile RobotCommand currentCommand; 
-// [THÊM] Biến cờ báo hiệu chạy mù (Blind Mode)
 extern volatile bool runBlind;
 
+// - Scanner sẽ DISARM ngay khi đọc được QR hợp lệ
+// - Khi nhận lệnh STEP (FORWARD/LEFT/RIGHT/BACK), NetworkTask sẽ set thời điểm mở lại
+extern volatile uint32_t scannerUnlockAtMs;
+extern volatile bool scannerArmed;
+
+// [THÊM DÒNG NÀY] Biến cờ báo hiệu đã Calib xong chưa
+extern volatile bool isCalibrated; 
+// ===== ADD: Heading state để reset hướng khi về bến =====
+enum RobotHeading {
+    HEADING_NORTH = 0,
+    HEADING_EAST  = 1,
+    HEADING_SOUTH = 2,   // mặc định: hướng "đi vào trong map" (1.1 -> 2.1)
+    HEADING_WEST  = 3
+};
+
+extern volatile RobotHeading currentHeading;
+extern volatile bool needHeadingAlign;
+extern volatile RobotHeading desiredHeading;
 #endif

@@ -4,40 +4,45 @@
 
 // --- 1. Cấu hình GM65 (QR Code) ---
 // LƯU Ý: Phải đổi sang chân khác vì 16, 17 đã dùng cho Sensor
-#define RX_PIN 16 
-#define TX_PIN 17 
+#define RX_PIN 22 
+#define TX_PIN 23 
 #define GM65_BAUD_RATE 115200
 
-// --- 2. Cấu hình 5 Mắt Dò Line (INPUT) ---
-// Thứ tự: {16, 17, 5, 18, 19}
-#define SENSOR_1 19 // Trái cùng
-#define SENSOR_2 18
-#define SENSOR_3 5  // Giữa
-#define SENSOR_4 22
-#define SENSOR_5 23 // Phải cùng
-#define NUM_SENSORS 5
+// --- 2. Cấu hình 8 Mắt Dò Line (INPUT ANALOG) ---
+// Thứ tự từ Trái sang Phải: S0 -> S7
+#define SENSOR_0 35
+#define SENSOR_1 32
+#define SENSOR_2 33
+#define SENSOR_3 34
+#define SENSOR_4 36
+#define SENSOR_5 39
+//#define SENSOR_6 27
+//#define SENSOR_7 14 
+#define NUM_SENSORS 6
 
 // --- 3. Cấu hình Động Cơ (OUTPUT) ---
-// Right Motor (EnA) - InA (35), InB (32)
-// LƯU Ý: GPIO 35 trên ESP32 thường là INPUT ONLY. Kiểm tra kỹ nếu bánh phải không chạy.
-#define MOTOR_R_PWM 26 
-#define MOTOR_R_IN1 4 
-#define MOTOR_R_IN2 32 
+// Dựa trên code mới (L298N Mode):
+// Left Motor: LDIR(5), IN4(18), LPWM(19)
+#define PIN_LDIR     5
+#define PIN_IN4_LEFT 18
+#define PIN_LPWM     19
 
-// Left Motor (EnB) - InC (33), InD (25)
-#define MOTOR_L_PWM 27 
-#define MOTOR_L_IN1 33 
-#define MOTOR_L_IN2 25 
+// Right Motor: RDIR(17), IN2(16), RPWM(4)
+#define PIN_RDIR      17
+#define PIN_IN2_RIGHT 16
+#define PIN_RPWM      4
 
 // --- 4. PID & SPEED ---
-#define START_SPEED 75      //Define value < 60 (error motor) 
-#define MAX_SPEED   75      
-#define TURN_SPEED_LOW  150  
-#define TURN_SPEED_HIGH 150  
+#define BASE_SPEED    50    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
+#define BASE_SPEED_BLIND 65 
+#define MAX_SPEED     120    // Giới hạn PWM
+#define TURN_SPEED    65     // Tốc độ khi quay mù (Left/Right)
 
-#define PID_KP 11.5
-#define PID_KI 0.0 
-#define PID_KD 3.8
+// PID Constants từ code mới
+#define PID_KP 0.8
+#define PID_KD 2.4
+// Code mới không thấy dùng KI, nhưng giữ define nếu cần mở rộng sau này
+#define PID_KI 0.0
 
 // // --- 5. Hệ thống ---
 // // Chọn 1 trong 2: set VEHICLE_ID = 1 hoặc 2
