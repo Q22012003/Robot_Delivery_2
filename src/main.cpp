@@ -25,6 +25,9 @@ volatile bool isCalibrated = false;
 volatile RobotHeading currentHeading = HEADING_SOUTH;
 volatile bool needHeadingAlign = false;
 volatile RobotHeading desiredHeading = HEADING_SOUTH;
+volatile bool holdActive = false;
+volatile uint32_t holdUntilMs = 0;
+
 void setup() {
     // [THÊM DÒNG NÀY NGAY ĐẦU HÀM SETUP]
     // Tắt bộ phát hiện điện áp thấp -> ESP32 sẽ không reset khi đề pa motor

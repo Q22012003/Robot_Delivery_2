@@ -18,6 +18,10 @@ enum RobotCommand {
     CMD_BACK   
 };
 
+// ===== HOLD from backend =====
+extern volatile bool holdActive;
+extern volatile uint32_t holdUntilMs;
+
 extern QueueHandle_t scannerQueue;
 extern char currentTarget[64];
 extern volatile RobotCommand currentCommand; 

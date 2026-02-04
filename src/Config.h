@@ -33,10 +33,10 @@
 #define PIN_RPWM      4
 
 // --- 4. PID & SPEED ---
-#define BASE_SPEED    50    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
+#define BASE_SPEED    53    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
 #define BASE_SPEED_BLIND 65 
 #define MAX_SPEED     120    // Giới hạn PWM
-#define TURN_SPEED    65     // Tốc độ khi quay mù (Left/Right)
+#define TURN_SPEED    85     // Tốc độ khi quay mù (Left/Right)
 
 // PID Constants từ code mới
 #define PID_KP 0.8

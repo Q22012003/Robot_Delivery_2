@@ -13,6 +13,8 @@
 
 WiFiClientSecure net;
 PubSubClient client(net);
+static bool holdReportPending = false;
+static char lastKnownPos[64] = ""; // e.g., "2,2"
 
 
 // Hàm hỗ trợ nháy đèn (Block code)
@@ -114,14 +116,33 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
                    runBlind = true; // quay mù
                    currentHeading = (RobotHeading)((currentHeading + 2) % 4); // <<< quay 180°
                 }
-
                 else {
-                    currentCommand = CMD_STOP; 
-                    runBlind = false; // [THÊM] Báo hiệu quay mù
+                 currentCommand = CMD_STOP; 
+                 // --- TRƯỜNG HỢP 2: LỆNH GIỮ (HOLD) ---
+                 runBlind = false;
                 }
             }
         }
-        // --- TRƯỜNG HỢP 2: LỆNH DỪNG KHẨN CẤP (STOP) ---
+        // --- TRƯỜNG HỢP 2: LỆNH GIỮ (HOLD) ---
+        else if (type && strcmp(type, "HOLD") == 0) {
+            uint32_t ms = doc["ms"] | 7500;
+
+            currentCommand = CMD_STOP;
+            runBlind = false;
+
+            holdActive = true;
+            holdUntilMs = (uint32_t)(millis() + ms);
+            holdReportPending = true;
+
+            scannerArmed = false;
+            scannerUnlockAtMs = 0;
+
+            debug_printf("=> Command: HOLD %lu ms\n", (unsigned long)ms);
+
+            String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) + String("\",\"status\":\"HOLD_OK\"}");
+            client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
+        }
+        // --- TRƯỜNG HỢP 3: LỆNH DỪNG KHẨN CẤP (STOP) ---
         else if (type && strcmp(type, "STOP") == 0) {
 
      currentCommand = CMD_STOP;
@@ -233,10 +254,31 @@ void TaskNetwork(void *pvParameters) {
              digitalWrite(2, HIGH);
         }
         client.loop();
+        // ===== HOLD completion =====
+        if (holdActive && holdReportPending) {
+            if ((int32_t)(millis() - holdUntilMs) >= 0) {
+                holdActive = false;
+                holdReportPending = false;
+
+                scannerArmed = false;
+                scannerUnlockAtMs = 0;
+
+                String posStr = String(lastKnownPos);
+                if (posStr.length() > 0) {
+                    String donePayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) + String("\",\"position\":\"") + posStr + String("\",\"status\":\"HOLD_DONE\"}");
+                    client.publish(MQTT_TOPIC_PUBLISH, donePayload.c_str());
+                    debug_println("[NETWORK] Sent status: HOLD_DONE");
+                } else {
+                    client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"HOLD_DONE\"}");
+                }
+            }
+        }
 
         if (xQueueReceive(scannerQueue, &incomingMsg, pdMS_TO_TICKS(10)) == pdTRUE) {
             
             String scannedPos = String(incomingMsg.barcode);
+            strncpy(lastKnownPos, scannedPos.c_str(), sizeof(lastKnownPos) - 1);
+            lastKnownPos[sizeof(lastKnownPos) - 1] = '\0';
             //Serial.print("[SCANNER] Read: " + scannedPos);
               debug_println("[SCANNER] Read: " + scannedPos);
             bool isCorrect = false;

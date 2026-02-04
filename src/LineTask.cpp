@@ -21,8 +21,8 @@ unsigned long forwardBlindStartMs = 0;
 const unsigned long FORWARD_BLIND_MS = 1500;
 
 // ===== TURN APPROACH + ROTATE (no blind after turn) =====
-const unsigned long TURN_STRAIGHT_MS = 750;   // đi thẳng trước khi quay
-const unsigned long TURN_ROTATE_MS   = 1500;  // thời gian quay 90 độ (tùy robot)
+const unsigned long TURN_STRAIGHT_MS = 1250;   // đi thẳng trước khi quay
+const unsigned long TURN_ROTATE_MS   = 1000;  // thời gian quay 90 độ (tùy robot)
 const int TURN_STRAIGHT_SPEED = BASE_SPEED;   // tốc độ đi thẳng trước khi quay
 
 bool forwardBlindDone = false;             // chỉ cho blind-forward chạy 1 lần cho mỗi "lần nhận lệnh FORWARD"
@@ -200,10 +200,18 @@ void TaskLine(void *pvParameters) {
     debug_println("[LineTask] Ready. Waiting for command...");
 
     // BACK "tà đạo"
-    const int BACK_SPIN_MS = 2000;   // quay tại chỗ 2s
+    const int BACK_SPIN_MS = 3000;   // quay tại chỗ 2s
     const int BACK_STOP_MS = 120;    // dừng cho hết trớn
 
     for (;;) {
+            // ===== HOLD from backend: đứng yên và không dò line =====
+        if (holdActive) {
+            currentCommand = CMD_STOP;
+            runBlind = false;
+            speed_run(0, 0);
+            vTaskDelay(pdMS_TO_TICKS(20));
+            continue;
+        }
          // ===== EDGE DETECT COMMAND CHANGE =====
         if (currentCommand != lastCmdSeen) {
             RobotCommand prev = lastCmdSeen;
@@ -314,8 +322,8 @@ void TaskLine(void *pvParameters) {
             else if (currentCommand == CMD_FORWARD) {
                 // bạn đã muốn bỏ blind-forward -> vào dò line ngay
                 debug_println("(currentCommand == CMD_FORWARD 2s foward");
-                speed_run(70, 70);
-                vTaskDelay(pdMS_TO_TICKS(BACK_SPIN_MS));
+                speed_run(75, 75);
+                vTaskDelay(pdMS_TO_TICKS(1000));
                 debug_println("(currentCommand == CMD_FORWARD speed_run(0,0)");
                 speed_run(0, 0);
                 runBlind = false;

@@ -27,8 +27,16 @@ void TaskScanner(void *pvParameters) {
 for (;;) {
 
         unsigned long now0 = millis();
+            // ===== HOLD: mute scanner hoàn toàn =====
+       if (holdActive) {
+           scannerArmed = false;
+           scannerUnlockAtMs = 0;
+           vTaskDelay(pdMS_TO_TICKS(20));
+           continue;
+        }
+
       // ===== ARM lại nếu đã tới thời điểm mở khóa (do NetworkTask set) =====
-        if (!scannerArmed && scannerUnlockAtMs != 0) {
+    if (!scannerArmed && scannerUnlockAtMs != 0 && !holdActive) {
            if ((int32_t)(now0 - scannerUnlockAtMs) >= 0) {
                 scannerArmed = true;
                 scannerUnlockAtMs = 0;
