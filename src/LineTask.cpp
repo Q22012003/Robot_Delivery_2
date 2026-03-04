@@ -52,10 +52,16 @@ static void logSensorsMapped(const char* tag) {
 }
 
 void setupMotors() {
-    pinMode(PIN_LDIR, OUTPUT); pinMode(PIN_IN4_LEFT, OUTPUT); pinMode(PIN_LPWM, OUTPUT);
-    pinMode(PIN_RDIR, OUTPUT); pinMode(PIN_IN2_RIGHT, OUTPUT); pinMode(PIN_RPWM, OUTPUT);
-    digitalWrite(PIN_LDIR, LOW); digitalWrite(PIN_IN4_LEFT, LOW);
-    digitalWrite(PIN_RDIR, LOW); digitalWrite(PIN_IN2_RIGHT, LOW);
+    pinMode(PIN_LDIR, OUTPUT); 
+    pinMode(PIN_IN4_LEFT, OUTPUT); 
+    pinMode(PIN_LPWM, OUTPUT);
+    pinMode(PIN_RDIR, OUTPUT); 
+    pinMode(PIN_IN2_RIGHT, OUTPUT); 
+    pinMode(PIN_RPWM, OUTPUT);
+    digitalWrite(PIN_LDIR, LOW); 
+    digitalWrite(PIN_IN4_LEFT, LOW);
+    digitalWrite(PIN_RDIR, LOW); 
+    digitalWrite(PIN_IN2_RIGHT, LOW);
 }
 
 void setupSensors() {
@@ -76,15 +82,23 @@ void speed_run(int speedDC_left, int speedDC_right) {
     int pwm_right = abs(speedDC_right);
 
     if (speedDC_left < 0) {
-        digitalWrite(PIN_LDIR, LOW); digitalWrite(PIN_IN4_LEFT, HIGH); analogWrite(PIN_LPWM, pwm_left);
+        digitalWrite(PIN_LDIR, LOW); 
+        digitalWrite(PIN_IN4_LEFT, HIGH); 
+        analogWrite(PIN_LPWM, pwm_left);
     } else {
-        digitalWrite(PIN_LDIR, HIGH); digitalWrite(PIN_IN4_LEFT, LOW); analogWrite(PIN_LPWM, pwm_left);
+        digitalWrite(PIN_LDIR, HIGH); 
+        digitalWrite(PIN_IN4_LEFT, LOW); 
+        analogWrite(PIN_LPWM, pwm_left);
     }
 
     if (speedDC_right < 0) {
-        digitalWrite(PIN_RDIR, LOW); digitalWrite(PIN_IN2_RIGHT, HIGH); analogWrite(PIN_RPWM, pwm_right);
+        digitalWrite(PIN_RDIR, LOW); 
+        digitalWrite(PIN_IN2_RIGHT, HIGH); 
+        analogWrite(PIN_RPWM, pwm_right);
     } else {
-        digitalWrite(PIN_RDIR, HIGH); digitalWrite(PIN_IN2_RIGHT, LOW); analogWrite(PIN_RPWM, pwm_right);
+        digitalWrite(PIN_RDIR, HIGH); 
+        digitalWrite(PIN_IN2_RIGHT, LOW); 
+        analogWrite(PIN_RPWM, pwm_right);
     }
 }
 

@@ -67,6 +67,12 @@
 #define DEBUG_TX_PIN 14 // Nối vào RX của HC-05
 #define DEBUG_BAUD   9600 // HC-05 thường mặc định là 9600
 
+// --- 7. Led State ----
+#define RED_LED 25
+#define YELLOW_LED 26
+#define GREEN_LED 27
+
+// Stack size 
 #define QUEUE_LENGTH 10
 #define NETWORK_STACK_SIZE (1024 * 6)
 #define SCANNER_STACK_SIZE (1024 * 4)

@@ -2,15 +2,25 @@
 #define CERTIFICATES_H
 
 // WiFi
+#ifndef WIFI
+ //#define WIFI 1 
+ #define WIFI 2
+#endif
+#if (WIFI == 1)
+static const char* WIFI_SSID = "D906_TEC";
+static const char* WIFI_PASSWORD = "D906_TEC";
+
+#elif (WIFI == 2)
 static const char* WIFI_SSID = "MINH QUI";
 static const char* WIFI_PASSWORD = "99999999";
 
+#endif
 // AWS IoT endpoint
 static const char* AWS_IOT_ENDPOINT = "a33b04z4mm5umj-ats.iot.us-east-1.amazonaws.com";
 
 
 #ifndef VEHICLE_ID 
-  #define VEHICLE_ID 2
+  #define VEHICLE_ID 1
 #endif
 #if (VEHICLE_ID == 1)
   #define MQTT_CLIENT_ID        "ESP32_GM65_Client_01"

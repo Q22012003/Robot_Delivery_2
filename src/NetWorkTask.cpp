@@ -235,7 +235,6 @@ void connectAWS() {
 // --------------------------------------------------------------------------
 void TaskNetwork(void *pvParameters) {
     digitalWrite(2, LOW);
-    // [THÊM ĐOẠN NÀY] Chờ cho đến khi LineTask Calib xong (biến cờ true)
     debug_println("[NetworkTask] Waiting for Calibration...");
     while (!isCalibrated) {
         vTaskDelay(pdMS_TO_TICKS(100)); // Kiểm tra lại mỗi 100ms
@@ -247,10 +246,13 @@ void TaskNetwork(void *pvParameters) {
     ScannerMessage incomingMsg;
 
     for (;;) {
-        if (WiFi.status() != WL_CONNECTED) connectWiFi();
-        if (!client.connected()) connectAWS();
-        // Nếu đã kết nối OK, Đèn phải SÁNG LIÊN TỤC
-        if (WiFi.status() == WL_CONNECTED && client.connected()) {
+        if (WiFi.status() != WL_CONNECTED) {
+            connectWiFi();
+        }
+        if (!client.connected()) {
+            connectAWS();
+        }
+        if (WiFi.status() == WL_CONNECTED && client.connected()) {  
              digitalWrite(2, HIGH);
         }
         client.loop();
@@ -296,7 +298,6 @@ void TaskNetwork(void *pvParameters) {
             }
 
             // --- SỬA Ở ĐÂY ---
-            // Cũ: String statusStr = isCorrect ? "ARRIVED" : "MOVING";
             // Mới: Đổi thành "OK" để khớp với Backend Node.js
             String statusStr = isCorrect ? "OK" : "MOVING"; 
             

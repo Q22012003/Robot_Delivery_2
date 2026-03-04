@@ -25,7 +25,6 @@ void TaskScanner(void *pvParameters) {
     setupScanner();
 
 for (;;) {
-
         unsigned long now0 = millis();
             // ===== HOLD: mute scanner hoàn toàn =====
        if (holdActive) {
