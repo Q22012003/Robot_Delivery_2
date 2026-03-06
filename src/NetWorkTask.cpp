@@ -16,6 +16,24 @@ PubSubClient client(net);
 static bool holdReportPending = false;
 static char lastKnownPos[64] = ""; // e.g., "2,2"
 
+// ===== Traffic LED helper =====
+enum TrafficLedState { LED_STATE_RED, LED_STATE_YELLOW, LED_STATE_GREEN };
+
+static void setTrafficLed(TrafficLedState s) {
+    digitalWrite(RED_LED,    (s == LED_STATE_RED) ? HIGH : LOW);
+    digitalWrite(YELLOW_LED, (s == LED_STATE_YELLOW) ? HIGH : LOW);
+    digitalWrite(GREEN_LED,  (s == LED_STATE_GREEN) ? HIGH : LOW);
+}
+
+// HOLD luôn override sang VÀNG. Khi thoát HOLD sẽ tự về RED/GREEN theo hasDelivered
+static void updateTrafficLed() {
+    if (holdActive) {
+        setTrafficLed(LED_STATE_YELLOW);
+    } else {
+        setTrafficLed(hasDelivered ? LED_STATE_GREEN : LED_STATE_RED);
+    }
+}
+
 
 // Hàm hỗ trợ nháy đèn (Block code)
 void blinkLED(int delayTime) {
@@ -138,8 +156,48 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             scannerUnlockAtMs = 0;
 
             debug_printf("=> Command: HOLD %lu ms\n", (unsigned long)ms);
+            updateTrafficLed();
 
             String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) + String("\",\"status\":\"HOLD_OK\"}");
+            client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
+        }
+        // --- TRƯỜNG HỢP 3: ĐÃ GIAO HÀNG (DELIVERED) ---
+        else if (type && strcmp(type, "DELIVERED") == 0) {
+
+            // Đã giao hàng -> LED xanh (trừ khi đang HOLD)
+            hasDelivered = true;
+            updateTrafficLed();
+
+            debug_println("=> Command: DELIVERED (LED GREEN)");
+
+            String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) +
+                                String("\",\"status\":\"DELIVERED_OK\"}");
+            client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
+        }
+        // --- TRƯỜNG HỢP 4: HOÀN THÀNH (FINISH) ---
+        else if (type && strcmp(type, "FINISH") == 0) {
+
+            // Dừng xe và reset trạng thái nhiệm vụ về RED
+            currentCommand = CMD_STOP;
+            runBlind = false;
+
+            // clear target để tránh match cũ
+            currentTarget[0] = '\0';
+
+            // Hủy HOLD nếu đang giữ
+            holdActive = false;
+            holdUntilMs = 0;
+            holdReportPending = false;
+
+            // Về bến -> LED đỏ
+            hasDelivered = false;
+
+            updateTrafficLed();
+
+            debug_println("=> Command: FINISH (LED RED)");
+
+            String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) +
+                                String("\",\"status\":\"FINISH_OK\"}");
             client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
         }
         // --- TRƯỜNG HỢP 3: LỆNH DỪNG KHẨN CẤP (STOP) ---
@@ -156,6 +214,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
          debug_printf(" [RESET_HEADING -> SOUTH]\n");
      }
 
+     updateTrafficLed();
      client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOPPED_EMERGENCY\"}");
 }
     } else {
@@ -262,6 +321,8 @@ void TaskNetwork(void *pvParameters) {
                 holdActive = false;
                 holdReportPending = false;
 
+                updateTrafficLed();
+
                 scannerArmed = false;
                 scannerUnlockAtMs = 0;
 
@@ -289,8 +350,9 @@ void TaskNetwork(void *pvParameters) {
                     Serial.println(" -> [MATCH] REACHED TARGET! STOPPING.");
                     debug_printf(" -> [MATCH] REACHED TARGET! STOPPING.");
                     currentCommand = CMD_STOP; 
-                    strcpy(currentTarget, ""); 
+                    currentTarget[0] = '\0'; 
                     isCorrect = true;
+
                 } else {
                     Serial.printf(" -> [INFO] Passing node %s (Target: %s)\n", scannedPos.c_str(), currentTarget);
                       debug_printf("-> [INFO] Passing node %s (Target: %s)\n", scannedPos.c_str(), currentTarget);

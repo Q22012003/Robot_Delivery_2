@@ -22,6 +22,7 @@ volatile bool needHeadingAlign = false;
 volatile RobotHeading desiredHeading = HEADING_SOUTH;
 volatile bool holdActive = false;
 volatile uint32_t holdUntilMs = 0;
+volatile bool hasDelivered = false;     // false=đang đi giao hàng(RED), true=đã giao xong/đang về(GREEN)
 
 void setup() {
 

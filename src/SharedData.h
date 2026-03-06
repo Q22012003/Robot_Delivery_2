@@ -22,6 +22,11 @@ enum RobotCommand {
 extern volatile bool holdActive;
 extern volatile uint32_t holdUntilMs;
 
+// ===== LED / Mission state =====
+// false: đang đi giao hàng (LED ĐỎ)
+// true : đã giao hàng, đang quay về (LED XANH)
+extern volatile bool hasDelivered;
+
 extern QueueHandle_t scannerQueue;
 extern char currentTarget[64];
 extern volatile RobotCommand currentCommand; 

@@ -20,7 +20,7 @@ static const char* AWS_IOT_ENDPOINT = "a33b04z4mm5umj-ats.iot.us-east-1.amazonaw
 
 
 #ifndef VEHICLE_ID 
-  #define VEHICLE_ID 1
+  #define VEHICLE_ID 2
 #endif
 #if (VEHICLE_ID == 1)
   #define MQTT_CLIENT_ID        "ESP32_GM65_Client_01"
