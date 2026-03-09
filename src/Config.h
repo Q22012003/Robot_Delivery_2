@@ -72,6 +72,10 @@
 #define YELLOW_LED 26
 #define GREEN_LED 27
 
+// --- 8. ULTRASONIC ----
+#define ULTRASONIC_TRIG 21
+#define ULTRASONIC_ECHO 15
+
 // Stack size 
 #define QUEUE_LENGTH 10
 #define NETWORK_STACK_SIZE (1024 * 6)

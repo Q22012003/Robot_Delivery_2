@@ -5,7 +5,7 @@
 #include "ScannerTask.h"
 #include "LineTask.h"
 #include "DebuggerBLE.h"
-
+#include "Ultrasonic.h"
 // [THÊM 2 DÒNG NÀY ĐỂ TẮT BROWNOUT]
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
@@ -53,6 +53,8 @@ void setup() {
     xTaskCreatePinnedToCore(TaskLine,    "LineTask",    LINE_STACK_SIZE,    NULL, 2, NULL, 1); 
    // xTaskCreatePinnedToCore(TaskDebugBLE,"DebugBLE",    2048,              NULL, 1, NULL, 0);
 
+    // Task test cảm biến siêu âm
+    xTaskCreatePinnedToCore(TaskUltrasonicTest, "UltrasonicTest", 2048, NULL, 1, NULL, 0);
     debug_printf("All Tasks Started... Brownout Detector DISABLED.\n");
     debug_printf("System Ready. Waiting for commands...\n");
 }
