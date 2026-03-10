@@ -8,7 +8,7 @@ extern "C" {
 void Ultrasonic_Init(void);
 float Ultrasonic_ReadDistanceCm(void);
 float Ultrasonic_ReadDistanceCmAvg(int samples);
-void TaskUltrasonicTest(void *pvParameters);
+void TaskUltrasonic(void *pvParameters);
 
 #ifdef __cplusplus
 }

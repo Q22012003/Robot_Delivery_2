@@ -214,7 +214,7 @@ void TaskLine(void *pvParameters) {
     debug_println("[LineTask] Ready. Waiting for command...");
 
     // BACK "tà đạo"
-    const int BACK_SPIN_MS = 3000;   // quay tại chỗ 2s
+    const int BACK_SPIN_MS = 2000;   // quay tại chỗ 2s
     const int BACK_STOP_MS = 120;    // dừng cho hết trớn
 
     for (;;) {
@@ -232,6 +232,8 @@ void TaskLine(void *pvParameters) {
 
             // rời khỏi FORWARD -> lần sau quay lại FORWARD sẽ được phép blind lại 1 lần
             if (prev == CMD_FORWARD && currentCommand != CMD_FORWARD) {
+                forwardBlind = false;
+                forwardBlindStartMs = 0;
                 forwardBlindDone = false;
             }
 
@@ -296,6 +298,7 @@ void TaskLine(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(80));
 
                 runBlind = false;
+                forwardBlind = false;
                 currentCommand = CMD_FORWARD;     // vào PID ngay, KHÔNG đi mù
                 lastPos = 0; integral = 0; servoPwm = 0;
             }
@@ -312,6 +315,7 @@ void TaskLine(void *pvParameters) {
                 vTaskDelay(pdMS_TO_TICKS(80));
 
                 runBlind = false;
+                forwardBlind = false;
                 currentCommand = CMD_FORWARD;     // vào PID ngay, KHÔNG đi mù
                 lastPos = 0; integral = 0; servoPwm = 0;
             }
@@ -320,7 +324,7 @@ void TaskLine(void *pvParameters) {
                 Serial.printf("[%lu] BACK: spin %d ms then resume PID\n", millis(), BACK_SPIN_MS);
                 logSensorsMapped("BACK_ENTER_SENS");
 
-                speed_run(80, -80);
+                speed_run(90, -90);
                 vTaskDelay(pdMS_TO_TICKS(BACK_SPIN_MS));
 
                 speed_run(0, 0);
@@ -329,6 +333,7 @@ void TaskLine(void *pvParameters) {
                 logSensorsMapped("BACK_AFTER_SPIN_SENS");
 
                 runBlind = false;
+                forwardBlind = false;
                 currentCommand = CMD_FORWARD;
 
                 lastPos = 0; integral = 0; servoPwm = 0;
@@ -341,6 +346,7 @@ void TaskLine(void *pvParameters) {
                 debug_println("(currentCommand == CMD_FORWARD speed_run(0,0)");
                 speed_run(0, 0);
                 runBlind = false;
+                forwardBlind = false;
                 lastPos = 0; integral = 0; servoPwm = 0;
             }
             else {

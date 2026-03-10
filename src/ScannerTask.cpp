@@ -82,6 +82,15 @@ for (;;) {
 
                 BaseType_t ok = xQueueSend(scannerQueue, &msg, pdMS_TO_TICKS(10));
                 if (ok == pdTRUE) {
+                    // Nếu đang backtrack vì obstacle và đã quét lại đúng node cũ -> dừng chờ route mới
+                    if (obstacleBacktrackActive && strlen(lastKnownPos) > 0 && rawData.equals(String(lastKnownPos))) {
+                        obstacleBacktrackActive = false;
+                        obstacleAwaitingRoute = true;
+                        currentCommand = CMD_STOP;
+                        runBlind = false;
+                        debug_println("[OBSTACLE] Backtracked to last QR -> STOP and wait reroute: " + rawData);
+                    }
+
                     scannerArmed = false;
                     scannerUnlockAtMs = 0;
                     debug_println("[SCANNER] DISARM (latched after QR)");

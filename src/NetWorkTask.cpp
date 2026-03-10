@@ -14,7 +14,6 @@
 WiFiClientSecure net;
 PubSubClient client(net);
 static bool holdReportPending = false;
-static char lastKnownPos[64] = ""; // e.g., "2,2"
 
 // ===== Traffic LED helper =====
 enum TrafficLedState { LED_STATE_RED, LED_STATE_YELLOW, LED_STATE_GREEN };
@@ -41,6 +40,33 @@ void blinkLED(int delayTime) {
     vTaskDelay(pdMS_TO_TICKS(delayTime));
     digitalWrite(2, LOW);
     vTaskDelay(pdMS_TO_TICKS(delayTime));
+}
+
+static void clearObstacleState(bool clearDistance = true) {
+    obstacleReportPending = false;
+    obstacleBacktrackActive = false;
+    obstacleAwaitingRoute = false;
+    if (clearDistance) {
+        obstacleDistanceCm = -1.0f;
+    }
+}
+
+static void publishObstacleEvent() {
+    String posStr = strlen(lastKnownPos) > 0 ? String(lastKnownPos) : String("UNKNOWN");
+    String targetStr = strlen(currentTarget) > 0 ? String(currentTarget) : String("UNKNOWN");
+
+    String payload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) +
+                     String("\",\"position\":\"") + posStr +
+                     String("\",\"target\":\"") + targetStr +
+                     String("\",\"status\":\"Obstacles\",\"distance_cm\":") +
+                     String(obstacleDistanceCm, 2) +
+                     String(",\"heading\":") + String((int)currentHeading) +
+                     String(",\"phase\":\"BACKTRACKING\"}");
+
+    if (client.publish(MQTT_TOPIC_PUBLISH, payload.c_str())) {
+        debug_println("[NETWORK] Sent status: Obstacles");
+        obstacleReportPending = false;
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -77,6 +103,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             }
 
             if (dir) {
+                clearObstacleState();
+
 
                 // ===== Scanner latch schedule =====
                 // DISARM ngay khi nhận STEP, và hẹn ARM lại theo loại lệnh
@@ -154,6 +182,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
             scannerArmed = false;
             scannerUnlockAtMs = 0;
+            clearObstacleState(false);
 
             debug_printf("=> Command: HOLD %lu ms\n", (unsigned long)ms);
             updateTrafficLed();
@@ -191,6 +220,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
             // Về bến -> LED đỏ
             hasDelivered = false;
+            clearObstacleState();
 
             updateTrafficLed();
 
@@ -203,19 +233,25 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         // --- TRƯỜNG HỢP 3: LỆNH DỪNG KHẨN CẤP (STOP) ---
         else if (type && strcmp(type, "STOP") == 0) {
 
-     currentCommand = CMD_STOP;
-     debug_printf("=> Command: STOP");
+     if (obstacleBacktrackActive) {
+         debug_println("=> Command: STOP received during obstacle backtrack -> defer until previous QR is rescanned");
+         client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOP_DEFERRED_BACKTRACK\"}");
+     } else {
+         currentCommand = CMD_STOP;
+         runBlind = false;
+         debug_printf("=> Command: STOP");
 
-     // ===== ADD: nếu server muốn reset hướng =====
-     bool resetHeading = doc["reset_heading"] | false;
-     if (resetHeading) {
-         desiredHeading = HEADING_SOUTH;  // hướng chuẩn để lần sau forward đi vào map
-         needHeadingAlign = true;
-         debug_printf(" [RESET_HEADING -> SOUTH]\n");
+         // ===== ADD: nếu server muốn reset hướng =====
+         bool resetHeading = doc["reset_heading"] | false;
+         if (resetHeading) {
+             desiredHeading = HEADING_SOUTH;  // hướng chuẩn để lần sau forward đi vào map
+             needHeadingAlign = true;
+             debug_printf(" [RESET_HEADING -> SOUTH]\n");
+         }
+
+         updateTrafficLed();
+         client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOPPED_EMERGENCY\"}");
      }
-
-     updateTrafficLed();
-     client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOPPED_EMERGENCY\"}");
 }
     } else {
         Serial.print("Error parsing JSON: ");
@@ -315,6 +351,11 @@ void TaskNetwork(void *pvParameters) {
              digitalWrite(2, HIGH);
         }
         client.loop();
+
+        if (obstacleReportPending && WiFi.status() == WL_CONNECTED && client.connected()) {
+            publishObstacleEvent();
+        }
+
         // ===== HOLD completion =====
         if (holdActive && holdReportPending) {
             if ((int32_t)(millis() - holdUntilMs) >= 0) {

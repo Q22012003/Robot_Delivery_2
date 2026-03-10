@@ -50,4 +50,11 @@ enum RobotHeading {
 extern volatile RobotHeading currentHeading;
 extern volatile bool needHeadingAlign;
 extern volatile RobotHeading desiredHeading;
+
+// ===== OBSTACLE / BACKTRACK =====
+extern char lastKnownPos[64];                 // QR gần nhất đã quét thành công
+extern volatile bool obstacleReportPending;   // chờ NetworkTask publish sự kiện vật cản
+extern volatile bool obstacleBacktrackActive; // đang tự quay về node vừa quét
+extern volatile bool obstacleAwaitingRoute;   // đã quay về node cũ và đang chờ route mới
+extern volatile float obstacleDistanceCm;     // khoảng cách đo được khi phát hiện vật cản
 #endif

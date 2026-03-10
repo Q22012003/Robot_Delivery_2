@@ -23,6 +23,11 @@ volatile RobotHeading desiredHeading = HEADING_SOUTH;
 volatile bool holdActive = false;
 volatile uint32_t holdUntilMs = 0;
 volatile bool hasDelivered = false;     // false=đang đi giao hàng(RED), true=đã giao xong/đang về(GREEN)
+char lastKnownPos[64] = "";
+volatile bool obstacleReportPending = false;
+volatile bool obstacleBacktrackActive = false;
+volatile bool obstacleAwaitingRoute = false;
+volatile float obstacleDistanceCm = -1.0f;
 
 void setup() {
 
@@ -53,8 +58,8 @@ void setup() {
     xTaskCreatePinnedToCore(TaskLine,    "LineTask",    LINE_STACK_SIZE,    NULL, 2, NULL, 1); 
    // xTaskCreatePinnedToCore(TaskDebugBLE,"DebugBLE",    2048,              NULL, 1, NULL, 0);
 
-    // Task test cảm biến siêu âm
-    xTaskCreatePinnedToCore(TaskUltrasonicTest, "UltrasonicTest", 2048, NULL, 1, NULL, 0);
+    // Task giám sát cảm biến siêu âm + tự backtrack khi có vật cản
+    xTaskCreatePinnedToCore(TaskUltrasonic, "Ultrasonic", 3072, NULL, 1, NULL, 0);
     debug_printf("All Tasks Started... Brownout Detector DISABLED.\n");
     debug_printf("System Ready. Waiting for commands...\n");
 }

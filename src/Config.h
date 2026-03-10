@@ -33,7 +33,7 @@
 #define PIN_RPWM      4
 
 // --- 4. PID & SPEED ---
-#define BASE_SPEED    53    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
+#define BASE_SPEED    58    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
 #define BASE_SPEED_BLIND 65 
 #define MAX_SPEED     120    // Giới hạn PWM
 #define TURN_SPEED    85     // Tốc độ khi quay mù (Left/Right)
@@ -75,6 +75,14 @@
 // --- 8. ULTRASONIC ----
 #define ULTRASONIC_TRIG 21
 #define ULTRASONIC_ECHO 15
+
+// --- 9. OBSTACLE / ULTRASONIC LOGIC ----
+#define OBSTACLE_DISTANCE_CM           4.0f
+#define OBSTACLE_SAMPLES               3
+#define OBSTACLE_CONFIRM_HITS          2
+#define OBSTACLE_POLL_MS               80
+#define OBSTACLE_COOLDOWN_MS           2500
+#define OBSTACLE_BACK_ARM_DELAY_MS     3400
 
 // Stack size 
 #define QUEUE_LENGTH 10
