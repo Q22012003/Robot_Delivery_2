@@ -1,7 +1,7 @@
 // Config.h
 #ifndef CONFIG_H
 #define CONFIG_H
-
+#include "Certificates.h"
 // --- 1. Cấu hình GM65 (QR Code) ---
 // LƯU Ý: Phải đổi sang chân khác vì 16, 17 đã dùng cho Sensor
 #define RX_PIN 22 
@@ -33,10 +33,23 @@
 #define PIN_RPWM      4
 
 // --- 4. PID & SPEED ---
-#define BASE_SPEED    58    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
-#define BASE_SPEED_BLIND 65 
-#define MAX_SPEED     120    // Giới hạn PWM
-#define TURN_SPEED    85     // Tốc độ khi quay mù (Left/Right)
+// --- 4. PID & SPEED ---
+#if (VEHICLE_ID == 1 || VEHICLE_ID == 2)
+  #define BASE_SPEED       58    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
+  #define BASE_SPEED_BLIND 65
+  #define MAX_SPEED        120   // Giới hạn PWM
+  #define TURN_SPEED       85    // Tốc độ khi quay mù (Left/Right)
+  #define FORWARD 75
+  #define BACK 90
+#else
+  // V1 và V2 dùng chung
+  #define BASE_SPEED       50    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
+  #define BASE_SPEED_BLIND 45
+  #define MAX_SPEED        120   // Giới hạn PWM
+  #define TURN_SPEED       80    // Tốc độ khi quay mù (Left/Right)
+  #define FORWARD 60
+  #define BACK 70
+#endif
 
 // PID Constants từ code mới
 #define PID_KP 0.8

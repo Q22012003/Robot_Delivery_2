@@ -324,7 +324,7 @@ void TaskLine(void *pvParameters) {
                 Serial.printf("[%lu] BACK: spin %d ms then resume PID\n", millis(), BACK_SPIN_MS);
                 logSensorsMapped("BACK_ENTER_SENS");
 
-                speed_run(90, -90);
+                speed_run(BACK, -BACK);
                 vTaskDelay(pdMS_TO_TICKS(BACK_SPIN_MS));
 
                 speed_run(0, 0);
@@ -341,7 +341,7 @@ void TaskLine(void *pvParameters) {
             else if (currentCommand == CMD_FORWARD) {
                 // bạn đã muốn bỏ blind-forward -> vào dò line ngay
                 debug_println("(currentCommand == CMD_FORWARD 2s foward");
-                speed_run(75, 75);
+                speed_run(FORWARD, FORWARD);
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 debug_println("(currentCommand == CMD_FORWARD speed_run(0,0)");
                 speed_run(0, 0);
