@@ -16,4 +16,6 @@ void debug_printf(const char *format, ...);
 // Hàm in log thường
 void debug_println(String msg);
 
+void TaskDebugBLE(void* pv);
+
 #endif

@@ -5,5 +5,6 @@
 void setupMotors();
 void setupSensors();
 void TaskLine(void *pvParameters);
+void speed_run(int speedDC_left, int speedDC_right);
 
 #endif

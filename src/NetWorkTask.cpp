@@ -13,6 +13,25 @@
 
 WiFiClientSecure net;
 PubSubClient client(net);
+static bool holdReportPending = false;
+
+// ===== Traffic LED helper =====
+enum TrafficLedState { LED_STATE_RED, LED_STATE_YELLOW, LED_STATE_GREEN };
+
+static void setTrafficLed(TrafficLedState s) {
+    digitalWrite(RED_LED,    (s == LED_STATE_RED) ? HIGH : LOW);
+    digitalWrite(YELLOW_LED, (s == LED_STATE_YELLOW) ? HIGH : LOW);
+    digitalWrite(GREEN_LED,  (s == LED_STATE_GREEN) ? HIGH : LOW);
+}
+
+// HOLD luôn override sang VÀNG. Khi thoát HOLD sẽ tự về RED/GREEN theo hasDelivered
+static void updateTrafficLed() {
+    if (holdActive) {
+        setTrafficLed(LED_STATE_YELLOW);
+    } else {
+        setTrafficLed(hasDelivered ? LED_STATE_GREEN : LED_STATE_RED);
+    }
+}
 
 
 // Hàm hỗ trợ nháy đèn (Block code)
@@ -21,6 +40,33 @@ void blinkLED(int delayTime) {
     vTaskDelay(pdMS_TO_TICKS(delayTime));
     digitalWrite(2, LOW);
     vTaskDelay(pdMS_TO_TICKS(delayTime));
+}
+
+static void clearObstacleState(bool clearDistance = true) {
+    obstacleReportPending = false;
+    obstacleBacktrackActive = false;
+    obstacleAwaitingRoute = false;
+    if (clearDistance) {
+        obstacleDistanceCm = -1.0f;
+    }
+}
+
+static void publishObstacleEvent() {
+    String posStr = strlen(lastKnownPos) > 0 ? String(lastKnownPos) : String("UNKNOWN");
+    String targetStr = strlen(currentTarget) > 0 ? String(currentTarget) : String("UNKNOWN");
+
+    String payload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) +
+                     String("\",\"position\":\"") + posStr +
+                     String("\",\"target\":\"") + targetStr +
+                     String("\",\"status\":\"Obstacles\",\"distance_cm\":") +
+                     String(obstacleDistanceCm, 2) +
+                     String(",\"heading\":") + String((int)currentHeading) +
+                     String(",\"phase\":\"BACKTRACKING\"}");
+
+    if (client.publish(MQTT_TOPIC_PUBLISH, payload.c_str())) {
+        debug_println("[NETWORK] Sent status: Obstacles");
+        obstacleReportPending = false;
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -49,6 +95,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             const char* dir = doc["direction"]; 
             const char* target = doc["target"];
 
+
             // Cập nhật mục tiêu mới (VD: "2,2")
             if (target) {
                 strncpy(currentTarget, target, sizeof(currentTarget) - 1);
@@ -56,6 +103,25 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             }
 
             if (dir) {
+                clearObstacleState();
+
+
+                // ===== Scanner latch schedule =====
+                // DISARM ngay khi nhận STEP, và hẹn ARM lại theo loại lệnh
+                // (để tránh GM65 đọc lại QR cũ khi xe vừa bắt đầu chạy)
+                uint32_t armDelayMs = 2000; // default cho FORWARD
+                if (strcmp(dir, "LEFT") == 0 || strcmp(dir, "RIGHT") == 0) {
+                    armDelayMs = 2000 + 80 + 700;   // quay 2s + stop 80ms + 700ms vào forward
+                } else if (strcmp(dir, "BACK") == 0) {
+                    armDelayMs = 2000 + 120 + 700;  // back spin 2s + stop 120ms + 700ms
+                } else {
+                    armDelayMs = 2000;               // FORWARD
+                }
+
+                scannerArmed = false;
+                scannerUnlockAtMs = (uint32_t)(millis() + armDelayMs);
+                debug_printf("[SCANNER] STEP received -> DISARM, will ARM in %lu ms\n", (unsigned long)armDelayMs);
+
                 // A. Gửi xác nhận "CMD_OK" lên AWS ngay lập tức
                 // Để Server biết xe đã nhận lệnh và đang chuẩn bị chạy
                 String ackPayload = "{\"device_id\":\"" + String(MQTT_CLIENT_ID) + 
@@ -74,33 +140,119 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
                     debug_printf("=> ACTION: TURN LEFT");
                     currentCommand = CMD_TURN_LEFT; 
                     runBlind = true; // [THÊM] Báo hiệu quay mù
+                    currentHeading = (RobotHeading)((currentHeading + 3) % 4); // LEFT = -90°
                 } 
                 else if (strcmp(dir, "RIGHT") == 0) {
                     //Serial.println("=> ACTION: TURN RIGHT");
                       debug_printf("=> ACTION: TURN RIGHT");
                     currentCommand = CMD_TURN_RIGHT; 
                     runBlind = true; // [THÊM] Báo hiệu quay mù
+                    currentHeading = (RobotHeading)((currentHeading + 1) % 4); // RIGHT = +90°
                 }
                 else if (strcmp(dir, "FORWARD") == 0) {
                     //Serial.println("=> ACTION: GO STRAIGHT");
                       debug_printf("=> ACTION: GO STRAIGHT");
-                    xQueueReset(scannerQueue);
+                    //  xQueueReset(scannerQueue);
                     currentCommand = CMD_FORWARD;
                     runBlind = true; // [THÊM] Báo hiệu quay mù
                 }
+                else if (strcmp(dir, "BACK") == 0) {
+                   debug_printf("=> ACTION: BACK (U-TURN)\n");
+                   currentCommand = CMD_BACK;
+                   runBlind = true; // quay mù
+                   currentHeading = (RobotHeading)((currentHeading + 2) % 4); // <<< quay 180°
+                }
                 else {
-                    currentCommand = CMD_STOP; 
-                    runBlind = true; // [THÊM] Báo hiệu quay mù
+                 currentCommand = CMD_STOP; 
+                 // --- TRƯỜNG HỢP 2: LỆNH GIỮ (HOLD) ---
+                 runBlind = false;
                 }
             }
         }
-        // --- TRƯỜNG HỢP 2: LỆNH DỪNG KHẨN CẤP (STOP) ---
-        else if (type && strcmp(type, "STOP") == 0) {
-             currentCommand = CMD_STOP;
-             //Serial.println("=> Command: STOP");
-             debug_printf("=> Command: STOP");
-             client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOPPED_EMERGENCY\"}");
+        // --- TRƯỜNG HỢP 2: LỆNH GIỮ (HOLD) ---
+        else if (type && strcmp(type, "HOLD") == 0) {
+            uint32_t ms = doc["ms"] | 7500;
+
+            currentCommand = CMD_STOP;
+            runBlind = false;
+
+            holdActive = true;
+            holdUntilMs = (uint32_t)(millis() + ms);
+            holdReportPending = true;
+
+            scannerArmed = false;
+            scannerUnlockAtMs = 0;
+            clearObstacleState(false);
+
+            debug_printf("=> Command: HOLD %lu ms\n", (unsigned long)ms);
+            updateTrafficLed();
+
+            String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) + String("\",\"status\":\"HOLD_OK\"}");
+            client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
         }
+        // --- TRƯỜNG HỢP 3: ĐÃ GIAO HÀNG (DELIVERED) ---
+        else if (type && strcmp(type, "DELIVERED") == 0) {
+
+            // Đã giao hàng -> LED xanh (trừ khi đang HOLD)
+            hasDelivered = true;
+            updateTrafficLed();
+
+            debug_println("=> Command: DELIVERED (LED GREEN)");
+
+            String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) +
+                                String("\",\"status\":\"DELIVERED_OK\"}");
+            client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
+        }
+        // --- TRƯỜNG HỢP 4: HOÀN THÀNH (FINISH) ---
+        else if (type && strcmp(type, "FINISH") == 0) {
+
+            // Dừng xe và reset trạng thái nhiệm vụ về RED
+            currentCommand = CMD_STOP;
+            runBlind = false;
+
+            // clear target để tránh match cũ
+            currentTarget[0] = '\0';
+
+            // Hủy HOLD nếu đang giữ
+            holdActive = false;
+            holdUntilMs = 0;
+            holdReportPending = false;
+
+            // Về bến -> LED đỏ
+            hasDelivered = false;
+            clearObstacleState();
+
+            updateTrafficLed();
+
+            debug_println("=> Command: FINISH (LED RED)");
+
+            String ackPayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) +
+                                String("\",\"status\":\"FINISH_OK\"}");
+            client.publish(MQTT_TOPIC_PUBLISH, ackPayload.c_str());
+        }
+        // --- TRƯỜNG HỢP 3: LỆNH DỪNG KHẨN CẤP (STOP) ---
+        else if (type && strcmp(type, "STOP") == 0) {
+
+     if (obstacleBacktrackActive) {
+         debug_println("=> Command: STOP received during obstacle backtrack -> defer until previous QR is rescanned");
+         client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOP_DEFERRED_BACKTRACK\"}");
+     } else {
+         currentCommand = CMD_STOP;
+         runBlind = false;
+         debug_printf("=> Command: STOP");
+
+         // ===== ADD: nếu server muốn reset hướng =====
+         bool resetHeading = doc["reset_heading"] | false;
+         if (resetHeading) {
+             desiredHeading = HEADING_SOUTH;  // hướng chuẩn để lần sau forward đi vào map
+             needHeadingAlign = true;
+             debug_printf(" [RESET_HEADING -> SOUTH]\n");
+         }
+
+         updateTrafficLed();
+         client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"STOPPED_EMERGENCY\"}");
+     }
+}
     } else {
         Serial.print("Error parsing JSON: ");
         Serial.println(error.c_str());
@@ -178,23 +330,59 @@ void connectAWS() {
 // --------------------------------------------------------------------------
 void TaskNetwork(void *pvParameters) {
     digitalWrite(2, LOW);
+    debug_println("[NetworkTask] Waiting for Calibration...");
+    while (!isCalibrated) {
+        vTaskDelay(pdMS_TO_TICKS(100)); // Kiểm tra lại mỗi 100ms
+    }
+    debug_println("[NetworkTask] Calibration finished. Starting WiFi...");
     connectWiFi();
     connectAWS();
 
     ScannerMessage incomingMsg;
 
     for (;;) {
-        if (WiFi.status() != WL_CONNECTED) connectWiFi();
-        if (!client.connected()) connectAWS();
-        // Nếu đã kết nối OK, Đèn phải SÁNG LIÊN TỤC
-        if (WiFi.status() == WL_CONNECTED && client.connected()) {
+        if (WiFi.status() != WL_CONNECTED) {
+            connectWiFi();
+        }
+        if (!client.connected()) {
+            connectAWS();
+        }
+        if (WiFi.status() == WL_CONNECTED && client.connected()) {  
              digitalWrite(2, HIGH);
         }
         client.loop();
 
+        if (obstacleReportPending && WiFi.status() == WL_CONNECTED && client.connected()) {
+            publishObstacleEvent();
+        }
+
+        // ===== HOLD completion =====
+        if (holdActive && holdReportPending) {
+            if ((int32_t)(millis() - holdUntilMs) >= 0) {
+                holdActive = false;
+                holdReportPending = false;
+
+                updateTrafficLed();
+
+                scannerArmed = false;
+                scannerUnlockAtMs = 0;
+
+                String posStr = String(lastKnownPos);
+                if (posStr.length() > 0) {
+                    String donePayload = String("{\"device_id\":\"") + String(MQTT_CLIENT_ID) + String("\",\"position\":\"") + posStr + String("\",\"status\":\"HOLD_DONE\"}");
+                    client.publish(MQTT_TOPIC_PUBLISH, donePayload.c_str());
+                    debug_println("[NETWORK] Sent status: HOLD_DONE");
+                } else {
+                    client.publish(MQTT_TOPIC_PUBLISH, "{\"status\":\"HOLD_DONE\"}");
+                }
+            }
+        }
+
         if (xQueueReceive(scannerQueue, &incomingMsg, pdMS_TO_TICKS(10)) == pdTRUE) {
             
             String scannedPos = String(incomingMsg.barcode);
+            strncpy(lastKnownPos, scannedPos.c_str(), sizeof(lastKnownPos) - 1);
+            lastKnownPos[sizeof(lastKnownPos) - 1] = '\0';
             //Serial.print("[SCANNER] Read: " + scannedPos);
               debug_println("[SCANNER] Read: " + scannedPos);
             bool isCorrect = false;
@@ -203,8 +391,9 @@ void TaskNetwork(void *pvParameters) {
                     Serial.println(" -> [MATCH] REACHED TARGET! STOPPING.");
                     debug_printf(" -> [MATCH] REACHED TARGET! STOPPING.");
                     currentCommand = CMD_STOP; 
-                    strcpy(currentTarget, ""); 
+                    currentTarget[0] = '\0'; 
                     isCorrect = true;
+
                 } else {
                     Serial.printf(" -> [INFO] Passing node %s (Target: %s)\n", scannedPos.c_str(), currentTarget);
                       debug_printf("-> [INFO] Passing node %s (Target: %s)\n", scannedPos.c_str(), currentTarget);
@@ -212,7 +401,6 @@ void TaskNetwork(void *pvParameters) {
             }
 
             // --- SỬA Ở ĐÂY ---
-            // Cũ: String statusStr = isCorrect ? "ARRIVED" : "MOVING";
             // Mới: Đổi thành "OK" để khớp với Backend Node.js
             String statusStr = isCorrect ? "OK" : "MOVING"; 
             

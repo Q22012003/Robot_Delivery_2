@@ -51,3 +51,23 @@ void debug_println(String msg) {
     Serial.println(msg);
     SerialHC05.println(msg);
 }
+
+void TaskDebugBLE(void* pv) {
+    uint32_t lastBeat = 0;
+    for(;;) {
+        uint32_t now = millis();
+        if (now - lastBeat >= 1000) {
+            // heartbeat để biết chắc UART->HC05 đang chạy
+            SerialHC05.printf("[BT] alive ms=%lu\r\n", (unsigned long)now);
+            lastBeat = now;
+        }
+
+        // echo test: gõ vào MoBaXterm sẽ thấy phản hồi lại
+        while (SerialHC05.available()) {
+            char c = (char)SerialHC05.read();
+            Serial.write(c);          // xem trên USB nếu cần
+            SerialHC05.write(c);      // echo lại BT
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
