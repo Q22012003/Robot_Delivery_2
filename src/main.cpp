@@ -59,7 +59,7 @@ void setup() {
    // xTaskCreatePinnedToCore(TaskDebugBLE,"DebugBLE",    2048,              NULL, 1, NULL, 0);
 
     // Task giám sát cảm biến siêu âm + tự backtrack khi có vật cản
-    xTaskCreatePinnedToCore(TaskUltrasonic, "Ultrasonic", 3072, NULL, 1, NULL, 0);
+   // xTaskCreatePinnedToCore(TaskUltrasonic, "Ultrasonic", 3072, NULL, 1, NULL, 0);
     debug_printf("All Tasks Started... Brownout Detector DISABLED.\n");
     debug_printf("System Ready. Waiting for commands...\n");
 }

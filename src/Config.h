@@ -35,18 +35,18 @@
 // --- 4. PID & SPEED ---
 // --- 4. PID & SPEED ---
 #if (VEHICLE_ID == 1 || VEHICLE_ID == 2)
-  #define BASE_SPEED       58    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
+  #define BASE_SPEED       55    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
   #define BASE_SPEED_BLIND 65
   #define MAX_SPEED        120   // Giới hạn PWM
   #define TURN_SPEED       85    // Tốc độ khi quay mù (Left/Right)
   #define FORWARD 75
-  #define BACK 90
+  #define BACK 110
 #else
   // V1 và V2 dùng chung
   #define BASE_SPEED       50    // Tốc độ chạy thẳng cơ bản (speed_run_forward)
-  #define BASE_SPEED_BLIND 45
+  #define BASE_SPEED_BLIND 60
   #define MAX_SPEED        120   // Giới hạn PWM
-  #define TURN_SPEED       80    // Tốc độ khi quay mù (Left/Right)
+  #define TURN_SPEED       70    // Tốc độ khi quay mù (Left/Right)
   #define FORWARD 60
   #define BACK 70
 #endif
